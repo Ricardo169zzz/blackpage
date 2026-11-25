@@ -24,8 +24,8 @@ export function renderProgressHtml({ label = "Mengunduh...", percent = null, byt
     typeof percent === "number"
       ? `${percent}%`
       : bytes > 0
-      ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-      : "...";
+        ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+        : "...";
   const isIndet = typeof percent !== "number";
   const widthStyle = isIndet ? "" : `style="width:${Math.max(0, Math.min(100, percent))}%"`;
   const totalText = total > 0 ? ` (${(bytes / (1024 * 1024)).toFixed(1)}/${(total / (1024 * 1024)).toFixed(1)} MB)` : "";
@@ -111,6 +111,10 @@ function scheduleMorphToCircle() {
   }, 3000);
 }
 
+const RING_CIRCUMFERENCE = 125.66; // 2 * PI * 20
+let renderedMode = ""; // "circle" | "rect"
+let renderedStatus = "";
+
 function renderToast() {
   const el = ensureToastEl();
   el.hidden = false;
@@ -119,67 +123,110 @@ function renderToast() {
   el.classList.toggle("is-error", toastState.status === "error");
 
   const pct = typeof toastState.percent === "number" ? Math.max(0, Math.min(100, toastState.percent)) : null;
-  const ringCircumference = 125.66; // 2 * PI * 20
-  const ringOffset = pct === null ? ringCircumference * 0.65 : ringCircumference * (1 - pct / 100);
+  const mode = toastState.isCircle ? "circle" : "rect";
+  const needsRebuild = renderedMode !== mode || renderedStatus !== toastState.status || !el.firstElementChild;
 
   const iconSvg =
     toastState.status === "done"
       ? `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"><polyline points="20 6 9 17 4 12"/></svg>`
       : toastState.status === "error"
-      ? `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
-      : `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square"><path d="M12 4v11"/><polyline points="7 11 12 16 17 11"/><path d="M5 20h14"/></svg>`;
+        ? `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+        : `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square"><path d="M12 4v11"/><polyline points="7 11 12 16 17 11"/><path d="M5 20h14"/></svg>`;
 
-  if (toastState.isCircle) {
+  if (mode === "circle") {
+    if (needsRebuild) {
+      el.innerHTML = `
+        <div class="dl-circle-badge" title="${escapeAttr(toastState.filename || "Mengunduh")}">
+          <svg class="dl-circle-ring" viewBox="0 0 48 48">
+            <circle class="dl-ring-track" cx="24" cy="24" r="20" />
+            <circle class="dl-ring-fill" cx="24" cy="24" r="20" style="stroke-dasharray:${RING_CIRCUMFERENCE};stroke-dashoffset:${RING_CIRCUMFERENCE}" />
+          </svg>
+          <span class="dl-circle-icon">${iconSvg}</span>
+          <span class="dl-circle-pct" hidden></span>
+        </div>
+      `;
+      renderedMode = mode;
+      renderedStatus = toastState.status;
+    }
+
+    const ringEl = el.querySelector(".dl-circle-ring");
+    const ringFill = el.querySelector(".dl-ring-fill");
+    const pctBadge = el.querySelector(".dl-circle-pct");
+    const isSpin = pct === null && toastState.status === "downloading";
+    const ringOffset =
+      toastState.status === "done"
+        ? 0
+        : pct === null
+          ? RING_CIRCUMFERENCE * 0.65
+          : RING_CIRCUMFERENCE * (1 - pct / 100);
+
+    if (ringEl) ringEl.classList.toggle("is-spin", isSpin);
+    if (ringFill) ringFill.style.strokeDashoffset = ringOffset.toFixed(2);
+    if (pctBadge) {
+      if (pct !== null && toastState.status === "downloading") {
+        pctBadge.hidden = false;
+        pctBadge.textContent = `${pct}%`;
+      } else {
+        pctBadge.hidden = true;
+      }
+    }
+    return;
+  }
+
+  if (needsRebuild) {
     el.innerHTML = `
-      <div class="dl-circle-badge" title="${escapeAttr(toastState.filename || "Mengunduh")}">
-        <svg class="dl-circle-ring ${pct === null && toastState.status === "downloading" ? "is-spin" : ""}" viewBox="0 0 48 48">
-          <circle class="dl-ring-track" cx="24" cy="24" r="20" />
-          <circle class="dl-ring-fill" cx="24" cy="24" r="20" style="stroke-dasharray:${ringCircumference};stroke-dashoffset:${ringOffset.toFixed(2)}" />
-        </svg>
-        <span class="dl-circle-icon">${iconSvg}</span>
-        ${pct !== null && toastState.status === "downloading" ? `<span class="dl-circle-pct">${pct}%</span>` : ""}
+      <div class="dl-toast-rect">
+        <div class="dl-toast-row">
+          <span class="dl-toast-badge">${iconSvg}</span>
+          <div class="dl-toast-info">
+            <div class="dl-toast-title"></div>
+            <div class="dl-toast-sub"></div>
+          </div>
+          <span class="dl-toast-pct"></span>
+          <button type="button" class="dl-toast-close" data-toast-close aria-label="Tutup">&times;</button>
+        </div>
+        <div class="dl-progress-bar dl-toast-bar">
+          <div class="dl-progress-fill"></div>
+        </div>
       </div>
     `;
-    return;
+    renderedMode = mode;
+    renderedStatus = toastState.status;
   }
 
   const pctLabel =
     toastState.status === "done"
       ? "100%"
       : toastState.status === "error"
-      ? "GAGAL"
-      : pct !== null
-      ? `${pct}%`
-      : toastState.bytes > 0
-      ? `${(toastState.bytes / (1024 * 1024)).toFixed(1)} MB`
-      : "...";
+        ? "GAGAL"
+        : pct !== null
+          ? `${pct}%`
+          : toastState.bytes > 0
+            ? `${(toastState.bytes / (1024 * 1024)).toFixed(1)} MB`
+            : "...";
 
   const titleText =
     toastState.status === "done"
       ? "Unduhan selesai"
       : toastState.status === "error"
-      ? toastState.errorMsg || "Gagal mengunduh"
-      : "Mengunduh file...";
+        ? toastState.errorMsg || "Gagal mengunduh"
+        : "Mengunduh file...";
 
   const isIndet = toastState.status === "downloading" && pct === null;
   const fillWidth = toastState.status === "done" ? 100 : pct ?? 0;
 
-  el.innerHTML = `
-    <div class="dl-toast-rect">
-      <div class="dl-toast-row">
-        <span class="dl-toast-badge">${iconSvg}</span>
-        <div class="dl-toast-info">
-          <div class="dl-toast-title">${escapeAttr(titleText)}</div>
-          <div class="dl-toast-sub">${escapeAttr(toastState.filename || "media")}</div>
-        </div>
-        <span class="dl-toast-pct">${escapeAttr(pctLabel)}</span>
-        <button type="button" class="dl-toast-close" data-toast-close aria-label="Tutup">&times;</button>
-      </div>
-      <div class="dl-progress-bar dl-toast-bar">
-        <div class="dl-progress-fill ${isIndet ? "indeterminate" : ""}" style="${isIndet ? "" : `width:${fillWidth}%`}"></div>
-      </div>
-    </div>
-  `;
+  const titleEl = el.querySelector(".dl-toast-title");
+  const subEl = el.querySelector(".dl-toast-sub");
+  const pctEl = el.querySelector(".dl-toast-pct");
+  const fillEl = el.querySelector(".dl-progress-fill");
+
+  if (titleEl) titleEl.textContent = titleText;
+  if (subEl) subEl.textContent = toastState.filename || "media";
+  if (pctEl) pctEl.textContent = pctLabel;
+  if (fillEl) {
+    fillEl.classList.toggle("indeterminate", isIndet);
+    fillEl.style.width = isIndet ? "" : `${fillWidth}%`;
+  }
 }
 
 function beginGlobalToast(filename) {
@@ -304,7 +351,7 @@ export async function downloadMediaFile({ API_BASE, remoteUrl, mediaType, filena
           endGlobalToast(true);
           return { native: true, path: targetPath };
         } finally {
-          await progressHandle?.remove?.().catch?.(() => {});
+          await progressHandle?.remove?.().catch?.(() => { });
         }
       }
 

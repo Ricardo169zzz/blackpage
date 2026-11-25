@@ -1246,25 +1246,55 @@ function compareSemver(a, b) {
 
 async function checkAppUpdate() {
   let latest = "";
-  let url = `https://github.com/${GITHUB_REPO}/releases`;
-  const relRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-    headers: { Accept: "application/vnd.github+json" },
-  });
-  if (relRes.ok) {
-    const rel = await relRes.json();
-    latest = String(rel.tag_name || rel.name || "").replace(/^v/i, "");
-    if (rel.html_url) url = rel.html_url;
-  } else {
-    const tagRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/tags?per_page=1`, {
+  let url = `https://github.com/${GITHUB_REPO}/actions`;
+  try {
+    const relRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
       headers: { Accept: "application/vnd.github+json" },
     });
-    if (tagRes.ok) {
-      const tags = await tagRes.json();
-      if (Array.isArray(tags) && tags[0]?.name) {
-        latest = String(tags[0].name).replace(/^v/i, "");
-      }
+    if (relRes.ok) {
+      const rel = await relRes.json();
+      latest = String(rel.tag_name || rel.name || "").replace(/^v/i, "");
+      if (rel.html_url) url = rel.html_url;
     }
+  } catch {}
+
+  if (!latest) {
+    try {
+      const tagRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/tags?per_page=1`, {
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      if (tagRes.ok) {
+        const tags = await tagRes.json();
+        if (Array.isArray(tags) && tags[0]?.name) {
+          latest = String(tags[0].name).replace(/^v/i, "");
+        }
+      }
+    } catch {}
   }
+
+  if (!latest) {
+    try {
+      const pkgRes = await fetch(
+        `https://raw.githubusercontent.com/${GITHUB_REPO}/main/package.json?t=${Date.now()}`,
+        { cache: "no-store" }
+      );
+      if (pkgRes.ok) {
+        const pkg = await pkgRes.json();
+        if (pkg?.version) latest = String(pkg.version).replace(/^v/i, "");
+      }
+    } catch {}
+  }
+
+  if (!latest) {
+    try {
+      const healthRes = await fetch(`${getApiBase()}/api/health`, { cache: "no-store" });
+      if (healthRes.ok) {
+        const info = await healthRes.json();
+        if (info?.version) latest = String(info.version).replace(/^v/i, "");
+      }
+    } catch {}
+  }
+
   const hasUpdate = Boolean(latest && compareSemver(latest, APP_VERSION) > 0);
   latestUpdateInfo = { latest: latest || APP_VERSION, hasUpdate, url };
   if (hasUpdate && statusEl?.lastElementChild && !statusEl.classList.contains("offline")) {

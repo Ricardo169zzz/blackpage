@@ -151,10 +151,13 @@ body::before {
 }
 
 @keyframes pulseDot {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.45;
     transform: scale(0.8);
@@ -759,6 +762,7 @@ body::before {
   from {
     transform: translateX(-100%);
   }
+
   to {
     transform: translateX(100%);
   }
@@ -1120,6 +1124,7 @@ body::before {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -1252,7 +1257,8 @@ body::before {
 .dl-progress-fill {
   height: 100%;
   background: var(--accent, #d93829);
-  transition: width 0.12s linear;
+  transition: width 0.24s ease-out;
+  will-change: width;
 }
 
 .dl-progress-fill.indeterminate {
@@ -1261,8 +1267,13 @@ body::before {
 }
 
 @keyframes bpIndeterminate {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(240%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(240%);
+  }
 }
 
 .pl-head-actions {
@@ -1403,8 +1414,13 @@ body::before {
 }
 
 @keyframes bpRingSpin {
-  from { transform: rotate(-90deg); }
-  to { transform: rotate(270deg); }
+  from {
+    transform: rotate(-90deg);
+  }
+
+  to {
+    transform: rotate(270deg);
+  }
 }
 
 .dl-ring-track {
@@ -1418,7 +1434,7 @@ body::before {
   stroke: var(--accent, #d93829);
   stroke-width: 3.5;
   stroke-linecap: butt;
-  transition: stroke-dashoffset 0.15s linear;
+  transition: stroke-dashoffset 0.24s ease-out;
 }
 
 .dl-circle-icon {
@@ -1450,6 +1466,7 @@ body::before {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

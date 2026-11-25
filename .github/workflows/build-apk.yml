@@ -55,6 +55,8 @@ jobs:
             const svg = fs.readFileSync("public/icon.svg", "utf8");
             const iconPng = new Resvg(svg, { fitTo: { mode: "width", value: 1024 } }).render().asPng();
             fs.writeFileSync("assets/icon-only.png", iconPng);
+            const fgSvg = svg.replace(/<rect[^>]*fill="#141414"[^>]*\/>/, "");
+            fs.writeFileSync("assets/icon-foreground.png", new Resvg(fgSvg, { fitTo: { mode: "width", value: 1024 } }).render().asPng());
             const bgSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#141414"/></svg>`;
             fs.writeFileSync("assets/icon-background.png", new Resvg(bgSvg).render().asPng());
             const splashSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732" width="2732" height="2732"><rect width="2732" height="2732" fill="#141414"/><g transform="translate(854, 854) scale(1)">${svg.replace(/<\/?svg[^>]*>/g, "")}</g></svg>`;
@@ -64,7 +66,33 @@ jobs:
       - name: Generate Android Project & Icons
         run: |
           npx cap add android
-          npx capacitor-assets generate --android
+          npx capacitor-assets generate --android --iconBackgroundColor "#141414" --splashBackgroundColor "#141414"
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const { Resvg } = require("@resvg/resvg-js");
+            const svg = fs.readFileSync("public/icon.svg", "utf8");
+            const fgSvg = svg.replace(/<rect[^>]*fill="#141414"[^>]*\/>/, "");
+            const densities = [
+              ["mipmap-mdpi", 48, 108],
+              ["mipmap-hdpi", 72, 162],
+              ["mipmap-xhdpi", 96, 216],
+              ["mipmap-xxhdpi", 144, 324],
+              ["mipmap-xxxhdpi", 192, 432]
+            ];
+            for (const [dir, iconSize, fgSize] of densities) {
+              const outDir = path.join("android/app/src/main/res", dir);
+              fs.mkdirSync(outDir, { recursive: true });
+              const iconBuf = new Resvg(svg, { fitTo: { mode: "width", value: iconSize } }).render().asPng();
+              const fgBuf = new Resvg(fgSvg, { fitTo: { mode: "width", value: fgSize } }).render().asPng();
+              fs.writeFileSync(path.join(outDir, "ic_launcher.png"), iconBuf);
+              fs.writeFileSync(path.join(outDir, "ic_launcher_round.png"), iconBuf);
+              fs.writeFileSync(path.join(outDir, "ic_launcher_foreground.png"), fgBuf);
+            }
+            const bgXmlPath = "android/app/src/main/res/values/ic_launcher_background.xml";
+            fs.mkdirSync(path.dirname(bgXmlPath), { recursive: true });
+            fs.writeFileSync(bgXmlPath, `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="ic_launcher_background">#141414</color>\n</resources>\n`);
+          '
           npx cap sync android
 
       - name: Patch AndroidManifest.xml permissions & cleartext
