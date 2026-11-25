@@ -8,7 +8,8 @@ on:
       api_base:
         description: "Optional default API Base URL (e.g. https://your-server.com)"
         required: false
-        default: ""
+        type: string
+        default: "https://blackpage-eta.vercel.app"
 
 jobs:
   build-apk:
@@ -28,8 +29,7 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
-      - name: Inject optional API_BASE into index.html
-        if: ${{ inputs.api_base != '' }}
+      - name: Inject API_BASE into index.html
         run: |
           node -e '
             const fs = require("fs");
@@ -39,7 +39,7 @@ jobs:
             fs.writeFileSync("public/index.html", html);
           '
         env:
-          API_BASE: ${{ inputs.api_base }}
+          API_BASE: ${{ inputs.api_base || 'https://blackpage-eta.vercel.app' }}
 
       - name: Install Capacitor & Plugins
         run: |
