@@ -1224,6 +1224,54 @@ body::before {
   transform: translateY(1px) scale(0.97);
 }
 
+.dl-progress-wrap {
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  padding: 8px 10px;
+  margin-top: 8px;
+}
+
+.dl-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.dl-progress-bar {
+  height: 10px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.dl-progress-fill {
+  height: 100%;
+  background: var(--accent, #d93829);
+  transition: width 0.12s linear;
+}
+
+.dl-progress-fill.indeterminate {
+  width: 45% !important;
+  animation: bpIndeterminate 1s ease-in-out infinite;
+}
+
+@keyframes bpIndeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(240%); }
+}
+
+.pl-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

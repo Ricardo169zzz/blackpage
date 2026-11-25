@@ -1,4 +1,4 @@
-import { makeProxyUrl, downloadMediaFile } from "./download.js";
+import { makeProxyUrl, downloadMediaFile, renderProgressHtml } from "./download.js";
 
 const GALLERY_KEY = "tools_op_tiktok_history_v1";
 const MAX_GALLERY = 30;
@@ -206,6 +206,13 @@ export const youtubeTool = {
           remoteUrl: currentData.downloadUrl,
           mediaType: isAudio ? "audio" : "video",
           filename,
+          onProgress: (p) => {
+            btn.textContent = typeof p.percent === "number" ? `${p.percent}%` : "Mengunduh...";
+            feedbackEl.innerHTML = renderProgressHtml({
+              label: isAudio ? "Mengunduh MP3..." : "Mengunduh Video...",
+              ...p,
+            });
+          },
         });
 
         if (prefs.autoSaveGallery !== false) {
@@ -227,11 +234,15 @@ export const youtubeTool = {
       }
     }
 
+    let currentPlaylist = null;
+    let queueAborted = false;
+
     function renderPlaylistResult(data) {
       setFeedback("", "");
+      currentPlaylist = data;
       const itemsHtml = (data.items || [])
         .map(
-          (item) => `
+          (item, i) => `
           <div class="gallery-row-card">
             ${item.thumbnail ? `<img class="gallery-thumb" src="${escapeHtml(item.thumbnail)}" alt="Thumb" loading="lazy" />` : `<span class="gallery-thumb gallery-thumb-fallback">YT</span>`}
             <div class="gallery-row-body">
@@ -241,7 +252,7 @@ export const youtubeTool = {
               </div>
               <p class="gallery-row-title">${escapeHtml(item.title)}</p>
             </div>
-            <button type="button" class="btn btn-sm btn-primary" data-pl-url="${escapeHtml(item.url)}">Ambil</button>
+            <button type="button" class="btn btn-sm btn-primary" data-pl-idx="${i}" data-pl-url="${escapeHtml(item.url)}">Ambil</button>
           </div>
         `
         )
@@ -251,11 +262,95 @@ export const youtubeTool = {
         <div class="result-card">
           <div class="stage-head" style="margin-bottom:4px;">
             <h3 style="margin:0;font-size:0.9rem;">${escapeHtml(data.title || "Playlist")}</h3>
-            <span class="tag">${(data.items || []).length} VIDEO</span>
+            <div class="pl-head-actions">
+              <span class="tag">${(data.items || []).length} VIDEO</span>
+              <button type="button" class="btn btn-sm btn-success" id="ytPlDownloadAll">Download Semua</button>
+            </div>
           </div>
+          <div id="ytPlQueueStatus"></div>
           <div class="gallery-list">${itemsHtml}</div>
         </div>
       `;
+    }
+
+    async function runPlaylistQueue(btn) {
+      const items = currentPlaylist?.items || [];
+      if (!items.length) return;
+      if (btn.dataset.running === "1") {
+        queueAborted = true;
+        btn.textContent = "Membatalkan...";
+        return;
+      }
+
+      queueAborted = false;
+      btn.dataset.running = "1";
+      btn.textContent = "Batal";
+      const [type, quality] = formatSel.value.split(":");
+      const statusEl = resultEl.querySelector("#ytPlQueueStatus");
+      let okCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < items.length; i++) {
+        if (queueAborted) break;
+        const item = items[i];
+        const rowBtn = resultEl.querySelector(`[data-pl-idx="${i}"]`);
+        if (rowBtn) {
+          rowBtn.disabled = true;
+          rowBtn.textContent = "...";
+        }
+        const label = `Antrean ${i + 1}/${items.length}: ${item.title || "Video"}`;
+        if (statusEl) statusEl.innerHTML = renderProgressHtml({ label, percent: null });
+
+        try {
+          const res = await fetch(`${API_BASE}/api/youtube`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: item.url, type, quality }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.downloadUrl) throw new Error(data.message || `HTTP ${res.status}`);
+
+          const isAudio = data.type === "audio";
+          const ext = isAudio ? "mp3" : "mp4";
+          const base = (data.title || "youtube")
+            .replace(/[^a-zA-Z0-9._-]+/g, "_")
+            .replace(/^_+|_+$/g, "")
+            .slice(0, 60) || "youtube";
+          const filename = data.filename || `${base}.${ext}`;
+
+          await downloadMediaFile({
+            API_BASE,
+            remoteUrl: data.downloadUrl,
+            mediaType: isAudio ? "audio" : "video",
+            filename,
+            onProgress: (p) => {
+              if (statusEl) statusEl.innerHTML = renderProgressHtml({ label, ...p });
+            },
+          });
+
+          if (prefs.autoSaveGallery !== false) {
+            saveToGallery({ ...data, filename });
+          }
+          okCount++;
+          if (rowBtn) rowBtn.textContent = "✓";
+        } catch {
+          failCount++;
+          if (rowBtn) {
+            rowBtn.textContent = "Gagal";
+            rowBtn.disabled = false;
+          }
+        }
+      }
+
+      delete btn.dataset.running;
+      btn.textContent = "Download Semua";
+      if (statusEl) {
+        statusEl.innerHTML = `<div class="alert alert-info">${
+          queueAborted
+            ? `Antrean dihentikan. Berhasil: ${okCount}, Gagal: ${failCount}.`
+            : `Antrean selesai! Berhasil: ${okCount}/${items.length}${failCount ? `, Gagal: ${failCount}` : ""}.`
+        }</div>`;
+      }
     }
 
     async function runFetch(targetUrl) {
@@ -328,6 +423,12 @@ export const youtubeTool = {
     }
 
     resultEl.addEventListener("click", async (e) => {
+      const plAllBtn = e.target.closest("#ytPlDownloadAll");
+      if (plAllBtn) {
+        runPlaylistQueue(plAllBtn);
+        return;
+      }
+
       const plBtn = e.target.closest("[data-pl-url]");
       if (plBtn) {
         setMode("single");

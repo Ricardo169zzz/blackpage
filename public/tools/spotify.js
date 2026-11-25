@@ -1,4 +1,4 @@
-import { makeProxyUrl, downloadMediaFile } from "./download.js";
+import { makeProxyUrl, downloadMediaFile, renderProgressHtml } from "./download.js";
 
 const GALLERY_KEY = "tools_op_tiktok_history_v1";
 const MAX_GALLERY = 30;
@@ -174,6 +174,10 @@ export const spotifyTool = {
           remoteUrl: currentData.mp3Url,
           mediaType: "audio",
           filename,
+          onProgress: (p) => {
+            btn.textContent = typeof p.percent === "number" ? `${p.percent}%` : "Mengunduh...";
+            feedbackEl.innerHTML = renderProgressHtml({ label: "Mengunduh MP3...", ...p });
+          },
         });
 
         if (prefs.autoSaveGallery !== false) {
@@ -199,11 +203,15 @@ export const spotifyTool = {
       }
     }
 
+    let currentPlaylist = null;
+    let queueAborted = false;
+
     function renderPlaylistResult(data) {
       setFeedback("", "");
+      currentPlaylist = data;
       const plCover = data.cover ? makeProxyUrl(API_BASE, data.cover) : "";
       const tracksHtml = (data.tracks || [])
-        .map((tr) => {
+        .map((tr, i) => {
           const thumb = tr.cover ? makeProxyUrl(API_BASE, tr.cover) : "";
           return `
             <div class="gallery-row-card">
@@ -215,7 +223,7 @@ export const spotifyTool = {
                 </div>
                 <p class="gallery-row-title">${escapeHtml(tr.title)}</p>
               </div>
-              <button type="button" class="btn btn-sm btn-primary" data-sp-track="${escapeHtml(tr.title)}">Ambil</button>
+              <button type="button" class="btn btn-sm btn-primary" data-sp-idx="${i}" data-sp-track="${escapeHtml(tr.title)}">Ambil</button>
             </div>
           `;
         })
@@ -228,11 +236,96 @@ export const spotifyTool = {
             <div class="author-info">
               <h3>${escapeHtml(data.title || "Spotify Playlist")}</h3>
             </div>
-            <span class="tag">${(data.tracks || []).length} LAGU</span>
+            <div class="pl-head-actions">
+              <span class="tag">${(data.tracks || []).length} LAGU</span>
+              <button type="button" class="btn btn-sm btn-success" id="spPlDownloadAll">Download Semua</button>
+            </div>
           </div>
+          <div id="spPlQueueStatus"></div>
           <div class="gallery-list">${tracksHtml}</div>
         </div>
       `;
+    }
+
+    async function runPlaylistQueue(btn) {
+      const tracks = currentPlaylist?.tracks || [];
+      if (!tracks.length) return;
+      if (btn.dataset.running === "1") {
+        queueAborted = true;
+        btn.textContent = "Membatalkan...";
+        return;
+      }
+
+      queueAborted = false;
+      btn.dataset.running = "1";
+      btn.textContent = "Batal";
+      const statusEl = resultEl.querySelector("#spPlQueueStatus");
+      let okCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < tracks.length; i++) {
+        if (queueAborted) break;
+        const tr = tracks[i];
+        const rowBtn = resultEl.querySelector(`[data-sp-idx="${i}"]`);
+        if (rowBtn) {
+          rowBtn.disabled = true;
+          rowBtn.textContent = "...";
+        }
+        const label = `Antrean ${i + 1}/${tracks.length}: ${tr.title || "Lagu"}`;
+        if (statusEl) statusEl.innerHTML = renderProgressHtml({ label, percent: null });
+
+        try {
+          const res = await fetch(`${API_BASE}/api/spotify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ q: tr.title }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.mp3Url) throw new Error(data.message || `HTTP ${res.status}`);
+
+          const base = `${data.title || "spotify"}_${data.artist || ""}`
+            .replace(/[^a-zA-Z0-9._-]+/g, "_")
+            .replace(/^_+|_+$/g, "")
+            .slice(0, 60) || "spotify";
+          const filename = `${base}.mp3`;
+
+          await downloadMediaFile({
+            API_BASE,
+            remoteUrl: data.mp3Url,
+            mediaType: "audio",
+            filename,
+            onProgress: (p) => {
+              if (statusEl) statusEl.innerHTML = renderProgressHtml({ label, ...p });
+            },
+          });
+
+          if (prefs.autoSaveGallery !== false) {
+            saveToGallery({
+              ...data,
+              url: data.spotifyUrl || data.query,
+              filename,
+            });
+          }
+          okCount++;
+          if (rowBtn) rowBtn.textContent = "✓";
+        } catch {
+          failCount++;
+          if (rowBtn) {
+            rowBtn.textContent = "Gagal";
+            rowBtn.disabled = false;
+          }
+        }
+      }
+
+      delete btn.dataset.running;
+      btn.textContent = "Download Semua";
+      if (statusEl) {
+        statusEl.innerHTML = `<div class="alert alert-info">${
+          queueAborted
+            ? `Antrean dihentikan. Berhasil: ${okCount}, Gagal: ${failCount}.`
+            : `Antrean selesai! Berhasil: ${okCount}/${tracks.length}${failCount ? `, Gagal: ${failCount}` : ""}.`
+        }</div>`;
+      }
     }
 
     async function runFetch(query) {
@@ -318,6 +411,12 @@ export const spotifyTool = {
     }
 
     resultEl.addEventListener("click", async (e) => {
+      const plAllBtn = e.target.closest("#spPlDownloadAll");
+      if (plAllBtn) {
+        runPlaylistQueue(plAllBtn);
+        return;
+      }
+
       const trBtn = e.target.closest("[data-sp-track]");
       if (trBtn) {
         setMode("single");

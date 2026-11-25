@@ -2,6 +2,13 @@
 
 Semua perubahan penting pada proyek **Blackpage** dicatat di file ini.
 
+## [1.1.0] — 2026-11-26
+
+### Fitur Baru
+- **Real-Time Download Progress Bar**: Indikator persentase/ukuran unduhan secara langsung (`renderProgressHtml` + `.dl-progress-bar`) di seluruh downloader dan tombol **Unduh Lagi** Galeri, mendukung `Filesystem.addListener("progress")` di APK Android maupun streaming `ReadableStream` di Web.
+- **Antrean Playlist (`Download Semua`)**: Tombol **Download Semua** (lengkap dengan tombol **Batal**, status item `✓` / `Gagal`, dan progres antrean `N/Total`) pada **YouTube Playlist** dan **Spotify Playlist**.
+- **Notifikasi Update APK Otomatis**: Pengecekan versi terbaru ke GitHub Releases/tags di **Setting -> Tentang & Bantuan** (`Cek Update`) serta pengecekan otomatis di background saat opsi `autoUpdate` aktif.
+
 ## [1.0.0] — 2026-11-26 (Stable Baseline)
 
 Versi stabil pertama yang siap dipakai harian di Web maupun Android APK.

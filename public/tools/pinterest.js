@@ -1,4 +1,4 @@
-import { makeProxyUrl, downloadMediaFile } from "./download.js";
+import { makeProxyUrl, downloadMediaFile, renderProgressHtml } from "./download.js";
 
 const GALLERY_KEY = "tools_op_tiktok_history_v1";
 const MAX_GALLERY = 30;
@@ -136,6 +136,10 @@ export const pinterestTool = {
           remoteUrl: item.url,
           mediaType: item.isVideo ? "video" : "image",
           filename,
+          onProgress: (p) => {
+            btn.textContent = typeof p.percent === "number" ? `${p.percent}%` : "Mengunduh...";
+            feedbackEl.innerHTML = renderProgressHtml({ label: "Mengunduh media...", ...p });
+          },
         });
 
         if (item.isVideo && prefs.autoSaveGallery !== false) {

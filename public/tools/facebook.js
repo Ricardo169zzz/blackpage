@@ -1,4 +1,4 @@
-import { makeProxyUrl, downloadMediaFile } from "./download.js";
+import { makeProxyUrl, downloadMediaFile, renderProgressHtml } from "./download.js";
 
 const GALLERY_KEY = "tools_op_tiktok_history_v1";
 const MAX_GALLERY = 30;
@@ -144,6 +144,10 @@ export const facebookTool = {
           remoteUrl: dl.url,
           mediaType: "video",
           filename,
+          onProgress: (p) => {
+            btn.textContent = typeof p.percent === "number" ? `${p.percent}%` : "Mengunduh...";
+            feedbackEl.innerHTML = renderProgressHtml({ label: "Mengunduh Video...", ...p });
+          },
         });
 
         if (prefs.autoSaveGallery !== false) {

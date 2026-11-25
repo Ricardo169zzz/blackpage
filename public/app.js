@@ -1,10 +1,11 @@
-import { downloadMediaFile } from "./tools/download.js";
+import { downloadMediaFile, renderProgressHtml } from "./tools/download.js";
 
 const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
 const THEME_KEY = "tools_op_theme_v1";
 const PREFS_KEY = "tools_op_prefs_v1";
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
+const GITHUB_REPO = "Ricardo169zzz/blackpage";
 
 const DEFAULT_PREFS = {
   autoPaste: false,
@@ -633,6 +634,10 @@ function renderGalleryDetail(idx, fromPopstate = false) {
           remoteUrl: item.mediaUrl,
           mediaType: item.mediaType === "audio" ? "audio" : item.mediaType === "image" ? "image" : "video",
           filename: item.filename || `blackpage_${Date.now()}.${item.mediaType === "audio" ? "mp3" : "mp4"}`,
+          onProgress: (p) => {
+            dlBtn.textContent = typeof p.percent === "number" ? `${p.percent}%` : "Mengunduh...";
+            feedbackEl.innerHTML = renderProgressHtml({ label: "Mengunduh...", ...p });
+          },
         });
         feedbackEl.innerHTML = `<div class="alert alert-info">${
           res.native ? `Tersimpan di ${escapeHtml(res.path)}!` : "Download dimulai!"
@@ -867,6 +872,15 @@ function renderTentangSettings() {
     </div>
 
     <div class="setting-group" style="margin-top: 12px;">
+      <div class="field-label">${isEn ? "APP UPDATES" : "PEMBARUAN APLIKASI"}</div>
+      <div id="updateStatusBox"></div>
+      <div class="settings-actions">
+        <button type="button" class="btn btn-primary" id="checkUpdateBtn">${isEn ? "Check for Updates" : "Cek Update"}</button>
+        <a class="btn" href="https://github.com/${GITHUB_REPO}/releases" target="_blank" rel="noopener">GitHub Releases</a>
+      </div>
+    </div>
+
+    <div class="setting-group" style="margin-top: 12px;">
       <div class="field-label">${isEn ? "QUICK GUIDE" : "PANDUAN CEPAT"}</div>
       <div class="alert alert-info path-info" style="margin-bottom:0;">
         1. ${isEn ? "Open TikTok Downloader, paste link, video auto-plays." : "Buka TikTok Downloader, tempel link, video otomatis diputar."}<br />
@@ -1053,6 +1067,34 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
     });
   }
 
+  if (section.id === "tentang") {
+    const checkBtn = stageEl.querySelector("#checkUpdateBtn");
+    const box = stageEl.querySelector("#updateStatusBox");
+    const renderUpdateState = (info) => {
+      if (!info) return;
+      if (info.hasUpdate) {
+        box.innerHTML = `<div class="alert alert-info"><strong>Update tersedia: v${escapeHtml(info.latest)}</strong> (saat ini v${APP_VERSION}). <a href="${escapeHtml(info.url)}" target="_blank" rel="noopener">Unduh APK terbaru</a></div>`;
+      } else {
+        box.innerHTML = `<div class="alert alert-info">Aplikasi sudah versi terbaru (v${APP_VERSION}).</div>`;
+      }
+    };
+    if (latestUpdateInfo) renderUpdateState(latestUpdateInfo);
+    checkBtn?.addEventListener("click", async () => {
+      checkBtn.disabled = true;
+      checkBtn.textContent = "Mengecek...";
+      box.innerHTML = `<div class="alert alert-info">Mengecek versi terbaru di GitHub...</div>`;
+      try {
+        const info = await checkAppUpdate();
+        renderUpdateState(info);
+      } catch (err) {
+        box.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message || "Gagal mengecek update.")}</div>`;
+      } finally {
+        checkBtn.disabled = false;
+        checkBtn.textContent = getLang() === "en" ? "Check for Updates" : "Cek Update";
+      }
+    });
+  }
+
   if (section.id === "umum") {
     const langSelectBtn = stageEl.querySelector("#langSelectBtn");
     const langRow = stageEl.querySelector("#langRow");
@@ -1173,6 +1215,47 @@ stageEl.addEventListener("click", (e) => {
   }
 });
 
+let latestUpdateInfo = null;
+
+function compareSemver(a, b) {
+  const pa = String(a || "").replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = String(b || "").replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+async function checkAppUpdate() {
+  let latest = "";
+  let url = `https://github.com/${GITHUB_REPO}/releases`;
+  const relRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+    headers: { Accept: "application/vnd.github+json" },
+  });
+  if (relRes.ok) {
+    const rel = await relRes.json();
+    latest = String(rel.tag_name || rel.name || "").replace(/^v/i, "");
+    if (rel.html_url) url = rel.html_url;
+  } else {
+    const tagRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/tags?per_page=1`, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (tagRes.ok) {
+      const tags = await tagRes.json();
+      if (Array.isArray(tags) && tags[0]?.name) {
+        latest = String(tags[0].name).replace(/^v/i, "");
+      }
+    }
+  }
+  const hasUpdate = Boolean(latest && compareSemver(latest, APP_VERSION) > 0);
+  latestUpdateInfo = { latest: latest || APP_VERSION, hasUpdate, url };
+  if (hasUpdate && statusEl?.lastElementChild && !statusEl.classList.contains("offline")) {
+    statusEl.lastElementChild.textContent = `UPDATE v${latest}`;
+  }
+  return latestUpdateInfo;
+}
+
 async function checkHealth() {
   try {
     const res = await fetch(`${getApiBase()}/api/health`);
@@ -1181,6 +1264,9 @@ async function checkHealth() {
     statusEl.classList.remove("offline");
     const hasUpdate = getPrefs().autoUpdate && info.version && info.version !== APP_VERSION;
     statusEl.lastElementChild.textContent = hasUpdate ? `UPDATE ${info.version}` : "ONLINE";
+    if (getPrefs().autoUpdate) {
+      checkAppUpdate().catch(() => {});
+    }
   } catch {
     statusEl.classList.add("offline");
     statusEl.lastElementChild.textContent = "OFFLINE";
