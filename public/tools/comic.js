@@ -14,7 +14,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
             <div class="comic-cover-wrap">
               ${
                 item.thumbnail
-                  ? `<img class="comic-cover" src="${escapeHtml(makeProxyUrl(API_BASE, item.thumbnail))}" alt="${escapeHtml(item.title)}" loading="lazy" />`
+                  ? `<img class="comic-cover" src="${escapeHtml(makeProxyUrl(API_BASE, item.thumbnail))}" alt="${escapeHtml(item.title)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';" /><span class="comic-cover-fallback" style="display:none;">KOMIK</span>`
                   : `<span class="comic-cover-fallback">KOMIK</span>`
               }
               <span class="tag comic-type-tag">${escapeHtml(item.type || "Manga")}</span>
@@ -27,7 +27,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       : `<div class="alert alert-info">Ketik judul komik atau pilih rekomendasi di atas.</div>`;
 
     stageEl.innerHTML = `
-      <button type="button" class="back-btn" id="comicBackHome">&larr; Halaman Utama</button>
+      <button type="button" class="btn btn-sm" id="comicBackHome" style="margin-bottom:10px;">&larr; Halaman Utama</button>
       <div class="panel-card">
         <div class="stage-head">
           <div>
@@ -87,7 +87,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
             <div class="comic-cover-wrap">
               ${
                 item.thumbnail
-                  ? `<img class="comic-cover" src="${escapeHtml(makeProxyUrl(API_BASE, item.thumbnail))}" alt="${escapeHtml(item.title)}" loading="lazy" />`
+                  ? `<img class="comic-cover" src="${escapeHtml(makeProxyUrl(API_BASE, item.thumbnail))}" alt="${escapeHtml(item.title)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';" /><span class="comic-cover-fallback" style="display:none;">KOMIK</span>`
                   : `<span class="comic-cover-fallback">KOMIK</span>`
               }
               <span class="tag comic-type-tag">${escapeHtml(item.type || "Manga")}</span>
@@ -131,7 +131,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
 
   async function openComicDetail(item) {
     stageEl.innerHTML = `
-      <button type="button" class="back-btn" id="comicBackSearch">&larr; Daftar Komik</button>
+      <button type="button" class="btn btn-sm" id="comicBackSearch" style="margin-bottom:10px;">&larr; Daftar Komik</button>
       <div class="panel-card"><div class="alert alert-info">Memuat detail &amp; daftar chapter...</div></div>
     `;
     stageEl.querySelector("#comicBackSearch")?.addEventListener("click", () => renderSearchView());
@@ -148,7 +148,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       renderComicDetail();
     } catch (err) {
       stageEl.innerHTML = `
-        <button type="button" class="back-btn" id="comicBackSearch">&larr; Daftar Komik</button>
+        <button type="button" class="btn btn-sm" id="comicBackSearch" style="margin-bottom:10px;">&larr; Daftar Komik</button>
         <div class="panel-card"><div class="alert alert-error">${escapeHtml(err.message || "Gagal membuka komik.")}</div></div>
       `;
       stageEl.querySelector("#comicBackSearch")?.addEventListener("click", () => renderSearchView());
@@ -160,7 +160,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
     const list = sortAsc ? [...currentComic.chapters] : [...currentComic.chapters].reverse();
 
     stageEl.innerHTML = `
-      <button type="button" class="back-btn" id="comicBackSearch">&larr; Daftar Komik</button>
+      <button type="button" class="btn btn-sm" id="comicBackSearch" style="margin-bottom:10px;">&larr; Daftar Komik</button>
       <div class="panel-card">
         <div class="comic-detail-head">
           ${
@@ -219,7 +219,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
     if (workspace) workspace.scrollTop = 0;
 
     stageEl.innerHTML = `
-      <button type="button" class="back-btn" id="comicBackDetail">&larr; Daftar Chapter</button>
+      <button type="button" class="btn btn-sm" id="comicBackDetail" style="margin-bottom:10px;">&larr; Daftar Chapter</button>
       <div class="panel-card"><div class="alert alert-info">Memuat halaman ${escapeHtml(ch.title)}...</div></div>
     `;
     stageEl.querySelector("#comicBackDetail")?.addEventListener("click", renderComicDetail);
@@ -244,7 +244,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       `;
 
       stageEl.innerHTML = `
-        <button type="button" class="back-btn" id="comicBackDetail">&larr; Daftar Chapter</button>
+        <button type="button" class="btn btn-sm" id="comicBackDetail" style="margin-bottom:10px;">&larr; Daftar Chapter</button>
         <div class="panel-card" style="padding:10px;">
           <h2 class="stage-title" style="font-size:0.95rem;margin-bottom:8px;">${escapeHtml(data.title || ch.title)}</h2>
           ${navHtml}
@@ -271,7 +271,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       });
     } catch (err) {
       stageEl.innerHTML = `
-        <button type="button" class="back-btn" id="comicBackDetail">&larr; Daftar Chapter</button>
+        <button type="button" class="btn btn-sm" id="comicBackDetail" style="margin-bottom:10px;">&larr; Daftar Chapter</button>
         <div class="panel-card"><div class="alert alert-error">${escapeHtml(err.message || "Gagal memuat chapter.")}</div></div>
       `;
       stageEl.querySelector("#comicBackDetail")?.addEventListener("click", renderComicDetail);
