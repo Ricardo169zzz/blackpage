@@ -2,6 +2,14 @@
 
 Semua perubahan penting pada proyek **Blackpage** dicatat di file ini.
 
+## [1.2.0] — 2026-11-26
+
+### Fitur Baru
+- **Floating Download Toast -> Lingkaran Kiri Bawah**: Setiap unduhan menampilkan toast persegi panjang selama 3 detik di atas navigasi bawah, lalu otomatis mengecil menjadi tombol lingkaran di kiri bawah dengan cincin progres SVG dan persentase (bisa diklik untuk melebarkan kembali).
+- **WMP Quote (`wmp1`)**: Tool generator gambar teks estetik (`JPG`) bareng **Brat** di kategori **Sticker**, mendukung pemisahan baris dengan Enter atau `|`.
+- **Text to Speech (`TTS Suara`)**: Tool pembuat suara MP3 di kategori **Utility** berbasis endpoint `/api/tts` ([lib/tts.js](file:///e:/TOOLS%20OP/lib/tts.js)) tanpa dependency eksternal (mendukung `ID`, `EN`, `JA`, `KO`, `AR`), lengkap dengan pemutar audio & unduh MP3.
+- **Logo Bauhaus Baru**: Pembaruan ikon vektor minimalis [public/icon.svg](file:///e:/TOOLS%20OP/public/icon.svg) untuk web, **Setting -> Tentang & Bantuan**, dan adaptive icon Android APK.
+
 ## [1.1.0] — 2026-11-26
 
 ### Fitur Baru

@@ -4,7 +4,7 @@ const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
 const THEME_KEY = "tools_op_theme_v1";
 const PREFS_KEY = "tools_op_prefs_v1";
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const GITHUB_REPO = "Ricardo169zzz/blackpage";
 
 const DEFAULT_PREFS = {
@@ -98,6 +98,8 @@ import { facebookTool } from "./tools/facebook.js";
 import { capcutTool } from "./tools/capcut.js";
 import { pinterestTool } from "./tools/pinterest.js";
 import { bratTool } from "./tools/brat.js";
+import { wmp1Tool } from "./tools/wmp1.js";
+import { ttsTool } from "./tools/tts.js";
 import { renderUniversalBoxHtml, initUniversalBox } from "./tools/universal.js";
 
 const LANG_KEY = "tools_op_lang_v1";
@@ -163,6 +165,8 @@ const FACEBOOK_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="curr
 const CAPCUT_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l16 12"/><path d="M20 6L4 18"/><rect x="3" y="4" width="18" height="16" rx="2"/></svg>`;
 const PINTEREST_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.64 19.31c-.1-.82-.19-2.08.04-2.97l1.34-5.68s-.34-.68-.34-1.69c0-1.58.92-2.76 2.06-2.76.97 0 1.44.73 1.44 1.6 0 .98-.62 2.44-.94 3.8-.27 1.13.57 2.05 1.68 2.05 2.02 0 3.57-2.13 3.57-5.2 0-2.72-1.95-4.62-4.74-4.62-3.23 0-5.13 2.42-5.13 4.93 0 .98.38 2.02.85 2.59.09.11.11.21.08.32l-.32 1.29c-.05.21-.17.25-.39.15-1.45-.68-2.36-2.8-2.36-4.5 0-3.66 2.66-7.03 7.67-7.03 4.03 0 7.16 2.87 7.16 6.71 0 4-2.52 7.22-6.02 7.22-1.18 0-2.28-.61-2.66-1.33l-.72 2.75c-.26 1.01-.97 2.27-1.44 3.04A10 10 0 1 0 12 2z"/></svg>`;
 const BRAT_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 10h10M7 14h6"/></svg>`;
+const WMP1_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 8h10M7 12h8M7 16h6"/></svg>`;
+const TTS_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
 const AIO_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
 
 const SUPPORT_DOWNLOADERS = [
@@ -183,6 +187,20 @@ const TOOLS = [
     icon: BRAT_SVG,
     category: "Sticker",
     color: "card-yellow",
+  },
+  {
+    ...wmp1Tool,
+    shortName: "WMP Quote",
+    icon: WMP1_SVG,
+    category: "Sticker",
+    color: "card-yellow",
+  },
+  {
+    ...ttsTool,
+    shortName: "TTS Suara",
+    icon: TTS_SVG,
+    category: "Utility",
+    color: "card-cyan",
   },
   {
     id: "ai-assistant",
@@ -639,9 +657,8 @@ function renderGalleryDetail(idx, fromPopstate = false) {
             feedbackEl.innerHTML = renderProgressHtml({ label: "Mengunduh...", ...p });
           },
         });
-        feedbackEl.innerHTML = `<div class="alert alert-info">${
-          res.native ? `Tersimpan di ${escapeHtml(res.path)}!` : "Download dimulai!"
-        }</div>`;
+        feedbackEl.innerHTML = `<div class="alert alert-info">${res.native ? `Tersimpan di ${escapeHtml(res.path)}!` : "Download dimulai!"
+          }</div>`;
       } catch (err) {
         feedbackEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message || "Gagal mengunduh file.")}</div>`;
       } finally {
@@ -858,7 +875,7 @@ function renderTentangSettings() {
   return `
     <div class="about-card">
       <div class="about-head">
-        <span class="brand-badge">BP</span>
+        <img src="./icon.svg" alt="Blackpage Logo" class="about-logo" />
         <div>
           <h3 style="margin:0;">BLACKPAGE</h3>
           <p class="stage-desc" style="margin:2px 0 0;">v${APP_VERSION} · Manga Editorial · APK-Ready</p>
@@ -1265,7 +1282,7 @@ async function checkHealth() {
     const hasUpdate = getPrefs().autoUpdate && info.version && info.version !== APP_VERSION;
     statusEl.lastElementChild.textContent = hasUpdate ? `UPDATE ${info.version}` : "ONLINE";
     if (getPrefs().autoUpdate) {
-      checkAppUpdate().catch(() => {});
+      checkAppUpdate().catch(() => { });
     }
   } catch {
     statusEl.classList.add("offline");

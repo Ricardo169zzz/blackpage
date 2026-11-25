@@ -317,7 +317,7 @@ export const tiktokTool = {
             if (prefs.autoAnalyze) runFetch(val);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     resultEl.addEventListener("click", async (e) => {

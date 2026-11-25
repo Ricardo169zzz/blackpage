@@ -1,16 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Deep Matte Ink Canvas -->
   <rect width="1024" height="1024" fill="#141414" />
-  <!-- Editorial Bauhaus Page Frame -->
-  <rect x="196" y="164" width="632" height="696" fill="none" stroke="#FAF7F0" stroke-width="36" />
-  <!-- Folded Top-Right Corner Accent (Bauhaus Red) -->
-  <polygon points="692,164 828,164 828,300" fill="#D93829" />
-  <!-- Geometric "BP" / Page Monogram -->
-  <rect x="296" y="292" width="64" height="440" fill="#FAF7F0" />
-  <rect x="360" y="292" width="196" height="64" fill="#FAF7F0" />
-  <rect x="360" y="480" width="212" height="64" fill="#FAF7F0" />
-  <rect x="360" y="668" width="212" height="64" fill="#FAF7F0" />
-  <rect x="524" y="340" width="64" height="156" fill="#FAF7F0" />
-  <rect x="540" y="528" width="64" height="156" fill="#FAF7F0" />
-  <!-- Minimal Bauhaus Red Circle Punctuation -->
-  <circle cx="690" cy="698" r="34" fill="#D93829" />
+
+  <!-- Centered Editorial Page Silhouette (Safe-zone padded for Android Adaptive Icons) -->
+  <path
+    d="M 284 220 H 612 L 740 348 V 780 C 740 793.255 729.255 804 716 804 H 284 C 270.745 804 260 793.255 260 780 V 244 C 260 230.745 270.745 220 284 220 Z"
+    fill="#FAF7F0"
+  />
+
+  <!-- Crisp Bauhaus Crimson Dog-Ear Fold -->
+  <path
+    d="M 612 220 L 740 348 H 636 C 622.745 348 612 337.255 612 324 V 220 Z"
+    fill="#D93829"
+  />
+
+  <!-- Geometrically Exact Editorial "B" Mark -->
+  <path
+    d="M 384 392 V 652 M 384 392 H 492 A 65 65 0 0 1 492 522 H 384 M 384 522 H 504 A 65 65 0 0 1 504 652 H 384"
+    fill="none"
+    stroke="#141414"
+    stroke-width="44"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
+  />
+
+  <!-- Subtle Crimson Accent Dot -->
+  <circle cx="642" cy="652" r="24" fill="#D93829" />
 </svg>
