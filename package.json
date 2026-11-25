@@ -1,0 +1,13 @@
+{
+  "name": "tools-op",
+  "version": "1.0.0",
+  "description": "TOOLS OP - Modular Neo-Brutalism Multi-Tool Web App (APK-ready)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/tiktok.test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
