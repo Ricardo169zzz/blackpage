@@ -1,12 +1,12 @@
 const assert = require("assert");
 const http = require("http");
-const { parse, isValidTikTokUrl } = require("../api/tiktok");
-const { isValidYouTubeUrl } = require("../api/youtube");
-const { isValidInstagramUrl } = require("../api/instagram");
-const { isValidFacebookUrl } = require("../api/facebook");
-const { isValidCapCutUrl } = require("../api/capcut");
-const { isValidPinterestUrl } = require("../api/pinterest");
-const { isValidSpotifyPlaylistUrl } = require("../api/spotify");
+const { parse, isValidTikTokUrl } = require("../lib/tiktok");
+const { isValidYouTubeUrl } = require("../lib/youtube");
+const { isValidInstagramUrl } = require("../lib/instagram");
+const { isValidFacebookUrl } = require("../lib/facebook");
+const { isValidCapCutUrl } = require("../lib/capcut");
+const { isValidPinterestUrl } = require("../lib/pinterest");
+const { isValidSpotifyPlaylistUrl } = require("../lib/spotify");
 const { createServer, isAllowedRemoteUrl, sanitizeFilename } = require("../server");
 
 function request(port, method, path, body = null) {
