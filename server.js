@@ -42,6 +42,12 @@ function sendJson(res, status, data) {
 }
 
 function readJsonBody(req) {
+  if (req.body !== undefined) {
+    if (typeof req.body === "string") {
+      return Promise.resolve(req.body ? JSON.parse(req.body) : {});
+    }
+    return Promise.resolve(req.body || {});
+  }
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
@@ -206,195 +212,197 @@ function serveStatic(req, res, pathname) {
   });
 }
 
-function createServer() {
-  return http.createServer(async (req, res) => {
-    const urlObj = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-    const { pathname, searchParams } = urlObj;
+async function handleRequest(req, res) {
+  const urlObj = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  const { pathname, searchParams } = urlObj;
 
-    if (req.method === "OPTIONS") {
-      res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Range",
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Range",
+    });
+    return res.end();
+  }
+
+  if (pathname === "/favicon.ico" && req.method === "GET") {
+    res.writeHead(204);
+    return res.end();
+  }
+
+  if (pathname === "/api/health" && req.method === "GET") {
+    return sendJson(res, 200, { ok: true, service: "blackpage", version: "1.0.0" });
+  }
+
+  if (pathname === "/api/media" && req.method === "GET") {
+    const targetUrl = searchParams.get("url") || "";
+    const download = searchParams.get("download") === "1";
+    const filename = searchParams.get("filename") || "";
+    return proxyMedia(req, res, targetUrl, { download, filename });
+  }
+
+  if (pathname === "/api/tiktok" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
+      const result = await fetchTikTok(targetUrl);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const code = err.statusCode || 500;
+      return sendJson(res, code, {
+        status: "error",
+        message: err.message || "Gagal memproses permintaan",
       });
-      return res.end();
     }
+  }
 
-    if (pathname === "/favicon.ico" && req.method === "GET") {
-      res.writeHead(204);
-      return res.end();
+  if (pathname === "/api/youtube" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
+      const result = await fetchYouTube(targetUrl, {
+        type: body.type,
+        quality: body.quality,
+      });
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const code = err.statusCode || 500;
+      return sendJson(res, code, {
+        status: "error",
+        message: err.message || "Gagal memproses permintaan YouTube",
+      });
     }
+  }
 
-    if (pathname === "/api/health" && req.method === "GET") {
-      return sendJson(res, 200, { ok: true, service: "blackpage", version: "1.0.0" });
+  if (pathname === "/api/youtube/playlist" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
+      const result = await fetchYouTubePlaylist(targetUrl);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const code = err.statusCode || 500;
+      return sendJson(res, code, {
+        status: "error",
+        message: err.message || "Gagal memproses playlist YouTube",
+      });
     }
+  }
 
-    if (pathname === "/api/media" && req.method === "GET") {
-      const targetUrl = searchParams.get("url") || "";
-      const download = searchParams.get("download") === "1";
-      const filename = searchParams.get("filename") || "";
-      return proxyMedia(req, res, targetUrl, { download, filename });
+  if (pathname === "/api/spotify" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const query = typeof body.q === "string" ? body.q.trim() : "";
+      const result = await fetchSpotify(query);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const code = err.statusCode || 500;
+      return sendJson(res, code, {
+        status: "error",
+        message: err.message || "Gagal memproses permintaan Spotify",
+      });
     }
+  }
 
-    if (pathname === "/api/tiktok" && req.method === "POST") {
-      try {
-        const body = await readJsonBody(req);
-        const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
-        const result = await fetchTikTok(targetUrl);
-        return sendJson(res, 200, result);
-      } catch (err) {
-        const code = err.statusCode || 500;
-        return sendJson(res, code, {
-          status: "error",
-          message: err.message || "Gagal memproses permintaan",
-        });
-      }
+  if (pathname === "/api/spotify/playlist" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
+      const result = await fetchSpotifyPlaylist(targetUrl);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const code = err.statusCode || 500;
+      return sendJson(res, code, {
+        status: "error",
+        message: err.message || "Gagal memproses playlist Spotify",
+      });
     }
+  }
 
-    if (pathname === "/api/youtube" && req.method === "POST") {
-      try {
-        const body = await readJsonBody(req);
-        const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
-        const result = await fetchYouTube(targetUrl, {
-          type: body.type,
-          quality: body.quality,
-        });
-        return sendJson(res, 200, result);
-      } catch (err) {
-        const code = err.statusCode || 500;
-        return sendJson(res, code, {
-          status: "error",
-          message: err.message || "Gagal memproses permintaan YouTube",
-        });
-      }
+  if (pathname === "/api/instagram" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
+      const result = await fetchInstagram(targetUrl);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const code = err.statusCode || 500;
+      return sendJson(res, code, {
+        status: "error",
+        message: err.message || "Gagal memproses permintaan Instagram",
+      });
     }
+  }
 
-    if (pathname === "/api/youtube/playlist" && req.method === "POST") {
-      try {
-        const body = await readJsonBody(req);
-        const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
-        const result = await fetchYouTubePlaylist(targetUrl);
-        return sendJson(res, 200, result);
-      } catch (err) {
-        const code = err.statusCode || 500;
-        return sendJson(res, code, {
-          status: "error",
-          message: err.message || "Gagal memproses playlist YouTube",
-        });
-      }
+  if (pathname === "/api/facebook" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
+      const result = await fetchFacebook(targetUrl);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const code = err.statusCode || 500;
+      return sendJson(res, code, {
+        status: "error",
+        message: err.message || "Gagal memproses permintaan Facebook",
+      });
     }
+  }
 
-    if (pathname === "/api/spotify" && req.method === "POST") {
-      try {
-        const body = await readJsonBody(req);
-        const query = typeof body.q === "string" ? body.q.trim() : "";
-        const result = await fetchSpotify(query);
-        return sendJson(res, 200, result);
-      } catch (err) {
-        const code = err.statusCode || 500;
-        return sendJson(res, code, {
-          status: "error",
-          message: err.message || "Gagal memproses permintaan Spotify",
-        });
-      }
+  if (pathname === "/api/capcut" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
+      const result = await fetchCapCut(targetUrl);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const code = err.statusCode || 500;
+      return sendJson(res, code, {
+        status: "error",
+        message: err.message || "Gagal memproses permintaan CapCut",
+      });
     }
+  }
 
-    if (pathname === "/api/spotify/playlist" && req.method === "POST") {
-      try {
-        const body = await readJsonBody(req);
-        const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
-        const result = await fetchSpotifyPlaylist(targetUrl);
-        return sendJson(res, 200, result);
-      } catch (err) {
-        const code = err.statusCode || 500;
-        return sendJson(res, code, {
-          status: "error",
-          message: err.message || "Gagal memproses playlist Spotify",
-        });
-      }
+  if (pathname === "/api/pinterest" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
+      const result = await fetchPinterest(targetUrl);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const code = err.statusCode || 500;
+      return sendJson(res, code, {
+        status: "error",
+        message: err.message || "Gagal memproses permintaan Pinterest",
+      });
     }
+  }
 
-    if (pathname === "/api/instagram" && req.method === "POST") {
-      try {
-        const body = await readJsonBody(req);
-        const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
-        const result = await fetchInstagram(targetUrl);
-        return sendJson(res, 200, result);
-      } catch (err) {
-        const code = err.statusCode || 500;
-        return sendJson(res, code, {
-          status: "error",
-          message: err.message || "Gagal memproses permintaan Instagram",
-        });
-      }
+  if (pathname === "/api/aio" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
+      const result = await fetchAio(targetUrl);
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const code = err.statusCode || 500;
+      return sendJson(res, code, {
+        status: "error",
+        message: err.message || "Gagal memproses link",
+      });
     }
+  }
 
-    if (pathname === "/api/facebook" && req.method === "POST") {
-      try {
-        const body = await readJsonBody(req);
-        const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
-        const result = await fetchFacebook(targetUrl);
-        return sendJson(res, 200, result);
-      } catch (err) {
-        const code = err.statusCode || 500;
-        return sendJson(res, code, {
-          status: "error",
-          message: err.message || "Gagal memproses permintaan Facebook",
-        });
-      }
-    }
+  if (req.method === "GET") {
+    return serveStatic(req, res, pathname);
+  }
 
-    if (pathname === "/api/capcut" && req.method === "POST") {
-      try {
-        const body = await readJsonBody(req);
-        const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
-        const result = await fetchCapCut(targetUrl);
-        return sendJson(res, 200, result);
-      } catch (err) {
-        const code = err.statusCode || 500;
-        return sendJson(res, code, {
-          status: "error",
-          message: err.message || "Gagal memproses permintaan CapCut",
-        });
-      }
-    }
+  sendJson(res, 405, { status: "error", message: "Method Not Allowed" });
+}
 
-    if (pathname === "/api/pinterest" && req.method === "POST") {
-      try {
-        const body = await readJsonBody(req);
-        const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
-        const result = await fetchPinterest(targetUrl);
-        return sendJson(res, 200, result);
-      } catch (err) {
-        const code = err.statusCode || 500;
-        return sendJson(res, code, {
-          status: "error",
-          message: err.message || "Gagal memproses permintaan Pinterest",
-        });
-      }
-    }
-
-    if (pathname === "/api/aio" && req.method === "POST") {
-      try {
-        const body = await readJsonBody(req);
-        const targetUrl = typeof body.url === "string" ? body.url.trim() : "";
-        const result = await fetchAio(targetUrl);
-        return sendJson(res, 200, result);
-      } catch (err) {
-        const code = err.statusCode || 500;
-        return sendJson(res, code, {
-          status: "error",
-          message: err.message || "Gagal memproses link",
-        });
-      }
-    }
-
-    if (req.method === "GET") {
-      return serveStatic(req, res, pathname);
-    }
-
-    sendJson(res, 405, { status: "error", message: "Method Not Allowed" });
-  });
+function createServer() {
+  return http.createServer(handleRequest);
 }
 
 if (require.main === module) {
@@ -404,4 +412,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createServer, isAllowedRemoteUrl, sanitizeFilename };
+module.exports = { createServer, handleRequest, isAllowedRemoteUrl, sanitizeFilename };

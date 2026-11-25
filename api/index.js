@@ -1,7 +1,5 @@
-const { createServer } = require("../server");
-
-const server = createServer();
+const { handleRequest } = require("../server");
 
 module.exports = (req, res) => {
-  server.emit("request", req, res);
+  return handleRequest(req, res);
 };
