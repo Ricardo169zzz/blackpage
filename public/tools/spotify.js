@@ -1,3 +1,5 @@
+import { makeProxyUrl, downloadMediaFile } from "./download.js";
+
 const GALLERY_KEY = "tools_op_tiktok_history_v1";
 const MAX_GALLERY = 30;
 
@@ -23,38 +25,6 @@ function saveToGallery(entry) {
     downloadedAt: Date.now(),
   });
   localStorage.setItem(GALLERY_KEY, JSON.stringify(list.slice(0, MAX_GALLERY)));
-}
-
-function makeProxyUrl(API_BASE, remoteUrl, { download = false, filename = "" } = {}) {
-  const params = new URLSearchParams({ url: remoteUrl });
-  if (download) params.set("download", "1");
-  if (filename) params.set("filename", filename);
-  return `${API_BASE}/api/media?${params.toString()}`;
-}
-
-async function saveOnAndroidCapacitor(blob, filename) {
-  const cap = window.Capacitor;
-  const fs = cap?.Plugins?.Filesystem;
-  if (!cap?.isNativePlatform?.() || !fs) return false;
-
-  const targetPath = `Download/Blackpage/audio/${filename}`;
-  const base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const res = String(reader.result || "");
-      resolve(res.split(",")[1] || "");
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-
-  await fs.writeFile({
-    path: targetPath,
-    data: base64,
-    directory: "EXTERNAL_STORAGE",
-    recursive: true,
-  });
-  return targetPath;
 }
 
 export const spotifyTool = {
@@ -199,31 +169,12 @@ export const spotifyTool = {
       btn.textContent = "Menyiapkan...";
 
       try {
-        if (window.Capacitor?.isNativePlatform?.()) {
-          const res = await fetch(makeProxyUrl(API_BASE, currentData.mp3Url));
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const blob = await res.blob();
-          const savedPath = await saveOnAndroidCapacitor(blob, filename);
-          if (savedPath) {
-            if (prefs.autoSaveGallery !== false) {
-              saveToGallery({
-                ...currentData,
-                url: currentData.spotifyUrl || currentData.query,
-                filename,
-              });
-            }
-            setFeedback("info", `Tersimpan di ${savedPath}!`);
-            return;
-          }
-        }
-
-        const dlUrl = makeProxyUrl(API_BASE, currentData.mp3Url, { download: true, filename });
-        const a = document.createElement("a");
-        a.href = dlUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        const res = await downloadMediaFile({
+          API_BASE,
+          remoteUrl: currentData.mp3Url,
+          mediaType: "audio",
+          filename,
+        });
 
         if (prefs.autoSaveGallery !== false) {
           saveToGallery({
@@ -231,9 +182,14 @@ export const spotifyTool = {
             url: currentData.spotifyUrl || currentData.query,
             filename,
           });
-          setFeedback("info", "Download MP3 dimulai & otomatis tersimpan di Galeri!");
+          setFeedback(
+            "info",
+            res.native
+              ? `Tersimpan di ${res.path} & masuk ke Galeri!`
+              : "Download MP3 dimulai & otomatis tersimpan di Galeri!"
+          );
         } else {
-          setFeedback("info", "Download MP3 dimulai!");
+          setFeedback("info", res.native ? `Tersimpan di ${res.path}!` : "Download MP3 dimulai!");
         }
       } catch (err) {
         setFeedback("error", err.message || "Gagal mengunduh MP3.");

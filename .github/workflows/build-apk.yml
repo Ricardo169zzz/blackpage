@@ -43,11 +43,28 @@ jobs:
 
       - name: Install Capacitor & Plugins
         run: |
-          npm install --no-save @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/app@6 @capacitor/filesystem@6
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/app@6 @capacitor/filesystem@6
+          npm install --no-save @capacitor/assets @resvg/resvg-js
 
-      - name: Generate Android Project
+      - name: Generate Android App Icon & Splash from SVG
+        run: |
+          node -e '
+            const fs = require("fs");
+            const { Resvg } = require("@resvg/resvg-js");
+            fs.mkdirSync("assets", { recursive: true });
+            const svg = fs.readFileSync("public/icon.svg", "utf8");
+            const iconPng = new Resvg(svg, { fitTo: { mode: "width", value: 1024 } }).render().asPng();
+            fs.writeFileSync("assets/icon-only.png", iconPng);
+            const bgSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#141414"/></svg>`;
+            fs.writeFileSync("assets/icon-background.png", new Resvg(bgSvg).render().asPng());
+            const splashSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732" width="2732" height="2732"><rect width="2732" height="2732" fill="#141414"/><g transform="translate(854, 854) scale(1)">${svg.replace(/<\/?svg[^>]*>/g, "")}</g></svg>`;
+            fs.writeFileSync("assets/splash.png", new Resvg(splashSvg, { fitTo: { mode: "width", value: 2732 } }).render().asPng());
+          '
+
+      - name: Generate Android Project & Icons
         run: |
           npx cap add android
+          npx capacitor-assets generate --android
           npx cap sync android
 
       - name: Patch AndroidManifest.xml permissions & cleartext

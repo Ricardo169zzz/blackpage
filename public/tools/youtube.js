@@ -1,3 +1,5 @@
+import { makeProxyUrl, downloadMediaFile } from "./download.js";
+
 const GALLERY_KEY = "tools_op_tiktok_history_v1";
 const MAX_GALLERY = 30;
 
@@ -23,40 +25,6 @@ function saveToGallery(entry) {
     downloadedAt: Date.now(),
   });
   localStorage.setItem(GALLERY_KEY, JSON.stringify(list.slice(0, MAX_GALLERY)));
-}
-
-function makeProxyUrl(API_BASE, remoteUrl, { download = false, filename = "" } = {}) {
-  const params = new URLSearchParams({ url: remoteUrl });
-  if (download) params.set("download", "1");
-  if (filename) params.set("filename", filename);
-  return `${API_BASE}/api/media?${params.toString()}`;
-}
-
-async function saveOnAndroidCapacitor(blob, filename, isAudio) {
-  const cap = window.Capacitor;
-  const fs = cap?.Plugins?.Filesystem;
-  if (!cap?.isNativePlatform?.() || !fs) return false;
-
-  const subDir = isAudio ? "audio" : "video";
-  const targetPath = `Download/Blackpage/${subDir}/${filename}`;
-
-  const base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const res = String(reader.result || "");
-      resolve(res.split(",")[1] || "");
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-
-  await fs.writeFile({
-    path: targetPath,
-    data: base64,
-    directory: "EXTERNAL_STORAGE",
-    recursive: true,
-  });
-  return targetPath;
 }
 
 function isYtUrl(val) {
@@ -233,33 +201,23 @@ export const youtubeTool = {
       btn.textContent = "Menyiapkan...";
 
       try {
-        if (window.Capacitor?.isNativePlatform?.()) {
-          const res = await fetch(makeProxyUrl(API_BASE, currentData.downloadUrl));
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const blob = await res.blob();
-          const savedPath = await saveOnAndroidCapacitor(blob, filename, isAudio);
-          if (savedPath) {
-            if (prefs.autoSaveGallery !== false) {
-              saveToGallery({ ...currentData, filename });
-            }
-            setFeedback("info", `Tersimpan di ${savedPath}!`);
-            return;
-          }
-        }
-
-        const dlUrl = makeProxyUrl(API_BASE, currentData.downloadUrl, { download: true, filename });
-        const a = document.createElement("a");
-        a.href = dlUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        const res = await downloadMediaFile({
+          API_BASE,
+          remoteUrl: currentData.downloadUrl,
+          mediaType: isAudio ? "audio" : "video",
+          filename,
+        });
 
         if (prefs.autoSaveGallery !== false) {
           saveToGallery({ ...currentData, filename });
-          setFeedback("info", "Download dimulai & otomatis tersimpan di Galeri!");
+          setFeedback(
+            "info",
+            res.native
+              ? `Tersimpan di ${res.path} & masuk ke Galeri!`
+              : "Download dimulai & otomatis tersimpan di Galeri!"
+          );
         } else {
-          setFeedback("info", "Download dimulai!");
+          setFeedback("info", res.native ? `Tersimpan di ${res.path}!` : "Download dimulai!");
         }
       } catch (err) {
         setFeedback("error", err.message || "Gagal mengunduh file.");

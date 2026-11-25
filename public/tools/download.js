@@ -9,19 +9,33 @@ export async function downloadMediaFile({ API_BASE, remoteUrl, mediaType, filena
   const cap = window.Capacitor;
   const fs = cap?.Plugins?.Filesystem;
 
-  if (cap?.isNativePlatform?.() && fs) {
+  if (cap?.isNativePlatform?.()) {
+    if (!fs) {
+      throw new Error("Plugin Filesystem belum aktif di APK. Silakan update/build ulang APK.");
+    }
     if (!API_BASE) {
       throw new Error("API Base URL belum diisi. Buka Setting -> Lanjutan lalu isi URL server.");
     }
 
     const subDir = mediaType === "audio" ? "audio" : mediaType === "image" ? "image" : "video";
-    const targetPath = `Download/Blackpage/${subDir}/${filename}`;
+    const dirPath = `Download/Blackpage/${subDir}`;
+    const targetPath = `${dirPath}/${filename}`;
     const sourceUrl = makeProxyUrl(API_BASE, remoteUrl, { download: true, filename });
 
     try {
       await fs.requestPermissions?.();
     } catch {
       // Android 13+ may not require legacy storage permission for Download/
+    }
+
+    try {
+      await fs.mkdir({
+        path: dirPath,
+        directory: "EXTERNAL_STORAGE",
+        recursive: true,
+      });
+    } catch {
+      // Folder may already exist
     }
 
     if (typeof fs.downloadFile === "function") {

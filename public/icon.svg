@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" fill="#141414" />
+  <!-- Editorial Bauhaus Page Frame -->
+  <rect x="196" y="164" width="632" height="696" fill="none" stroke="#FAF7F0" stroke-width="36" />
+  <!-- Folded Top-Right Corner Accent (Bauhaus Red) -->
+  <polygon points="692,164 828,164 828,300" fill="#D93829" />
+  <!-- Geometric "BP" / Page Monogram -->
+  <rect x="296" y="292" width="64" height="440" fill="#FAF7F0" />
+  <rect x="360" y="292" width="196" height="64" fill="#FAF7F0" />
+  <rect x="360" y="480" width="212" height="64" fill="#FAF7F0" />
+  <rect x="360" y="668" width="212" height="64" fill="#FAF7F0" />
+  <rect x="524" y="340" width="64" height="156" fill="#FAF7F0" />
+  <rect x="540" y="528" width="64" height="156" fill="#FAF7F0" />
+  <!-- Minimal Bauhaus Red Circle Punctuation -->
+  <circle cx="690" cy="698" r="34" fill="#D93829" />
+</svg>

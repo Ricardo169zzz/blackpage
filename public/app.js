@@ -1,3 +1,5 @@
+import { downloadMediaFile } from "./tools/download.js";
+
 const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
 const THEME_KEY = "tools_op_theme_v1";
@@ -596,7 +598,7 @@ function renderGalleryDetail(idx, fromPopstate = false) {
         <div id="galFeedback"></div>
 
         <div class="dl-list">
-          <a class="btn btn-success" href="${escapeHtml(dlHref)}" download="${escapeHtml(item.filename || "")}">Unduh Lagi</a>
+          <button type="button" class="btn btn-success" id="galDownloadBtn">Unduh Lagi</button>
           <button type="button" class="btn" id="galDeleteBtn">Hapus dari Galeri</button>
         </div>
       </div>
@@ -617,7 +619,32 @@ function renderGalleryDetail(idx, fromPopstate = false) {
   const copyAllBtn = stageEl.querySelector("#galCopyAll");
   const copySelBtn = stageEl.querySelector("#galCopySel");
   const feedbackEl = stageEl.querySelector("#galFeedback");
+  const dlBtn = stageEl.querySelector("#galDownloadBtn");
   const delBtn = stageEl.querySelector("#galDeleteBtn");
+
+  if (dlBtn) {
+    dlBtn.addEventListener("click", async () => {
+      const origText = dlBtn.textContent;
+      dlBtn.disabled = true;
+      dlBtn.textContent = "Menyiapkan...";
+      try {
+        const res = await downloadMediaFile({
+          API_BASE: apiBase,
+          remoteUrl: item.mediaUrl,
+          mediaType: item.mediaType === "audio" ? "audio" : item.mediaType === "image" ? "image" : "video",
+          filename: item.filename || `blackpage_${Date.now()}.${item.mediaType === "audio" ? "mp3" : "mp4"}`,
+        });
+        feedbackEl.innerHTML = `<div class="alert alert-info">${
+          res.native ? `Tersimpan di ${escapeHtml(res.path)}!` : "Download dimulai!"
+        }</div>`;
+      } catch (err) {
+        feedbackEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message || "Gagal mengunduh file.")}</div>`;
+      } finally {
+        dlBtn.disabled = false;
+        dlBtn.textContent = origText;
+      }
+    });
+  }
 
   if (copyAllBtn) {
     copyAllBtn.addEventListener("click", async () => {
