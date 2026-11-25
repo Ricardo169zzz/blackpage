@@ -1,8 +1,8 @@
-const { handleRequest } = require("../server");
+const { handleApiRequest } = require("../lib/router");
 
 module.exports = async (req, res) => {
   try {
-    await handleRequest(req, res);
+    await handleApiRequest(req, res);
   } catch (err) {
     if (!res.headersSent) {
       res.statusCode = 500;
