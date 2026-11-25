@@ -412,4 +412,8 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createServer, handleRequest, isAllowedRemoteUrl, sanitizeFilename };
+module.exports = handleRequest;
+module.exports.createServer = createServer;
+module.exports.handleRequest = handleRequest;
+module.exports.isAllowedRemoteUrl = isAllowedRemoteUrl;
+module.exports.sanitizeFilename = sanitizeFilename;
