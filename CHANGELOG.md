@@ -2,6 +2,11 @@
 
 Semua perubahan penting pada proyek **Blackpage** dicatat di file ini.
 
+## [1.3.0] — 2026-11-26
+
+### Fitur Baru
+- **Baca Komik (Komiku ID)**: Tombol spesial **BACA KOMIK** di bagian paling bawah Halaman Utama, terhubung ke scraper zero-dependency [lib/comic.js](file:///e:/TOOLS%20OP/lib/comic.js) (adaptasi dari `SCRAPER_COFLYN/lib/comic/komiku`), lengkap dengan pencarian komik, detail & daftar chapter (sort Terlama/Terbaru), dan pembaca vertikal lengkap dengan tombol Prev/Next Chapter ([public/tools/comic.js](file:///e:/TOOLS%20OP/public/tools/comic.js)).
+
 ## [1.2.0] — 2026-11-26
 
 ### Fitur Baru

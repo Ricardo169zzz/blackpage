@@ -4,7 +4,7 @@ const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
 const THEME_KEY = "tools_op_theme_v1";
 const PREFS_KEY = "tools_op_prefs_v1";
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 const GITHUB_REPO = "Ricardo169zzz/blackpage";
 
 const DEFAULT_PREFS = {
@@ -100,6 +100,7 @@ import { pinterestTool } from "./tools/pinterest.js";
 import { bratTool } from "./tools/brat.js";
 import { wmp1Tool } from "./tools/wmp1.js";
 import { ttsTool } from "./tools/tts.js";
+import { mountComicReader } from "./tools/comic.js";
 import { renderUniversalBoxHtml, initUniversalBox } from "./tools/universal.js";
 
 const LANG_KEY = "tools_op_lang_v1";
@@ -382,10 +383,35 @@ function renderHome(fromPopstate = false) {
       </div>
       <div class="tool-list tool-grid-2">${renderSupportDownloadersHtml()}</div>
     </div>
+
+    <button type="button" class="comic-hero-btn" id="openComicBtn">
+      <span class="comic-hero-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"><path d="M2 4h8a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2z"/><path d="M22 4h-8a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h9z"/></svg>
+      </span>
+      <span class="comic-hero-text">
+        <strong>BACA KOMIK</strong>
+        <small>Manga, Manhwa &amp; Manhua Sub Indo</small>
+      </span>
+      <span class="tag comic-hero-pill">BUKA &rarr;</span>
+    </button>
   `;
   playPageEnter();
 
   initUniversalBox(stageEl, { API_BASE: getApiBase(), escapeHtml, prefs: getPrefs() });
+  stageEl.querySelector("#openComicBtn")?.addEventListener("click", () => mountComicPage());
+}
+
+function mountComicPage(fromPopstate = false) {
+  activePage = "comic";
+  pushRoute("comic", fromPopstate);
+  renderNav();
+  stageEl.classList.remove("stage-split");
+  mountComicReader(stageEl, {
+    API_BASE: getApiBase(),
+    escapeHtml,
+    onBackHome: () => navigate("home"),
+  });
+  playPageEnter();
 }
 
 function renderToolsPage(fromPopstate = false) {
