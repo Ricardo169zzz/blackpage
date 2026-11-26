@@ -101,12 +101,17 @@ body::before {
   place-items: center;
   width: 32px;
   height: 32px;
-  background: var(--accent);
-  color: var(--surface);
+  background: var(--surface);
   border: var(--border);
-  font-weight: 800;
-  font-size: 0.82rem;
-  letter-spacing: 0.04em;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.brand-badge img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .brand-title {
@@ -173,7 +178,7 @@ body::before {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  padding: 10px 12px;
+  padding: 12px 13px 14px 11px;
   display: flex;
   flex-direction: column;
 }
@@ -254,10 +259,16 @@ body::before {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 12px;
   padding-bottom: 10px;
   border-bottom: 1.5px solid var(--ink);
+}
+
+.stage-head .tag,
+.dash-head .tag {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .stage-title {
@@ -367,6 +378,147 @@ body::before {
   word-break: break-word;
 }
 
+.tool-list.tool-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.tool-grid-3 .tool-card {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 5px;
+  padding: 9px 6px;
+}
+
+.tool-grid-3 .tool-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 0.7rem;
+}
+
+.tool-grid-3 .tool-card-body {
+  width: 100%;
+  min-width: 0;
+  gap: 2px;
+}
+
+.tool-grid-3 .tool-card-title {
+  font-size: 0.7rem;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tools Page Expandable Category Accordion */
+.tool-cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tool-cat-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tool-cat-btn {
+  padding: 12px 14px;
+}
+
+.tool-cat-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tool-cat-chevron {
+  font-size: 0.9rem;
+  font-weight: 800;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tool-cat-wrap.is-open .tool-cat-chevron {
+  transform: rotate(180deg);
+}
+
+.tool-cat-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 13px;
+}
+
+.tool-cat-panel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--ink);
+  transform-origin: top center;
+  animation: bpLineIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.tool-cat-wrap.is-closing .tool-cat-panel::before {
+  animation: bpLineOut 0.18s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes bpLineIn {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes bpLineOut {
+  from {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  to {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+
+.tool-stagger-item {
+  animation: bpStaggerIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--stagger-i, 0) * 42ms);
+}
+
+.tool-cat-wrap.is-closing .tool-cat-chevron {
+  transform: rotate(0deg);
+}
+
+.tool-cat-wrap.is-closing .tool-stagger-item {
+  animation: bpStaggerOut 0.18s cubic-bezier(0.4, 0, 1, 1) both;
+  animation-delay: calc(var(--exit-i, 0) * 24ms);
+  pointer-events: none;
+}
+
+@keyframes bpStaggerOut {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(0.98);
+  }
+}
+
 .tool-card {
   width: 100%;
   text-align: left;
@@ -474,6 +626,10 @@ body::before {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
+}
+
+.uni-box .input-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .brutal-input {
@@ -1467,33 +1623,52 @@ body::before {
   flex-shrink: 0;
 }
 
-/* Special Bottom Home Button & Comic Reader */
+/* Special Home Comic Reader Banner */
 .comic-hero-btn {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 13px 14px;
-  background: var(--ink);
-  color: var(--surface);
+  padding: 15px 14px;
+  background-color: #141416;
+  background-image:
+    linear-gradient(90deg, rgba(20, 20, 22, 0.84) 0%, rgba(20, 20, 22, 0.55) 58%, rgba(20, 20, 22, 0.35) 100%),
+    url("./comic-banner-light.jpg?v=88");
+  background-size: cover;
+  background-position: center;
+  color: #faf7f0;
   border: var(--border);
   box-shadow: var(--shadow-ink);
   cursor: pointer;
   text-align: left;
   font-family: inherit;
-  transition: transform 0.16s var(--ease);
+  transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease), filter 0.16s var(--ease);
+}
+
+[data-theme="dark"] .comic-hero-btn {
+  background-image:
+    linear-gradient(90deg, rgba(10, 10, 14, 0.86) 0%, rgba(10, 10, 14, 0.52) 58%, rgba(10, 10, 14, 0.32) 100%),
+    url("./comic-banner-dark.jpg?v=88");
+}
+
+.comic-hero-btn:hover {
+  filter: brightness(1.06);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 rgba(20, 20, 22, 0.9);
 }
 
 .comic-hero-btn:active {
-  transform: translateY(1px) scale(0.99);
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 rgba(20, 20, 22, 0.9);
 }
 
 .comic-hero-icon {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
-  background: var(--accent, #d93829);
-  color: #faf7f0;
+  background: #faf7f0;
+  color: #141416;
+  border: 2px solid #141416;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -1508,20 +1683,29 @@ body::before {
 }
 
 .comic-hero-text strong {
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
 }
 
 .comic-hero-text small {
   font-size: 0.72rem;
-  opacity: 0.82;
+  color: rgba(250, 247, 240, 0.88);
+  font-weight: 500;
 }
 
 .comic-hero-pill {
-  background: var(--surface);
-  color: var(--ink);
-  border-color: var(--surface);
+  background: #141416;
+  color: #faf7f0;
+  border-color: #141416;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  transition: transform 0.16s var(--ease);
+}
+
+.comic-hero-btn:hover .comic-hero-pill {
+  transform: translateX(2px);
 }
 
 .comic-grid {
@@ -1534,6 +1718,8 @@ body::before {
 .comic-card {
   display: flex;
   flex-direction: column;
+  animation: bpStaggerIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--comic-i, 0) * 24ms);
   background: var(--surface);
   color: var(--ink);
   border: 2px solid var(--ink);
@@ -1899,8 +2085,13 @@ body::before {
   display: grid;
   place-items: center;
   clip-path: inset(0 0 0 0);
+  transform: translate3d(0, 0, 0) scale(1);
   opacity: 1;
-  transition: clip-path 0.65s var(--ease), opacity 0.5s ease;
+  will-change: clip-path, transform, opacity;
+  transition:
+    clip-path 0.62s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.62s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.45s ease;
 }
 
 :root[data-theme="dark"] .bp-intro {
@@ -1910,6 +2101,7 @@ body::before {
 
 .bp-intro.is-exit {
   clip-path: inset(0 0 100% 0);
+  transform: translate3d(0, -12px, 0) scale(1.02);
   opacity: 0;
   pointer-events: none;
 }
@@ -1924,9 +2116,10 @@ body::before {
 .intro-logo-box {
   width: 88px;
   height: 88px;
+  opacity: 0;
   clip-path: inset(100% 0 0 0);
-  transform: translateY(10px) scale(1.04);
-  animation: bpLogoIn 0.75s var(--ease) 0.1s forwards;
+  transform: translate3d(0, 14px, 0) scale(0.94);
+  animation: bpLogoIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.08s forwards;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
   border-radius: 18px;
 }
@@ -1949,21 +2142,104 @@ body::before {
   letter-spacing: 0.28em;
   text-indent: 0.28em;
   opacity: 0;
-  transform: translateY(100%);
-  animation: bpTitleIn 0.6s var(--ease) 0.42s forwards;
+  transform: translate3d(0, 100%, 0);
+  animation: bpTitleIn 0.56s cubic-bezier(0.22, 1, 0.36, 1) 0.34s forwards;
 }
 
 @keyframes bpLogoIn {
   to {
+    opacity: 1;
     clip-path: inset(0 0 0 0);
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes bpTitleIn {
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes bpPopIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.result-card,
+.sticker-lightbox-frame {
+  animation: bpPopIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.comic-detail-head {
+  animation: bpPopIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.comic-chapter-btn {
+  animation: bpStaggerIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--comic-i, 0) * 18ms);
+}
+
+.comic-reader-pages img {
+  opacity: 0;
+  transform: translate3d(0, 12px, 0);
+  transition: opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1), transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.comic-reader-pages img.is-loaded {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.comic-modal-card {
+  animation: bpPopIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+#comicServerMenu.open {
+  animation: bpPopIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Home-Only First-Launch Staggered Entrance */
+.home-stagger.is-waiting > *,
+.home-stagger.is-waiting .support-card {
+  opacity: 0;
+}
+
+.home-stagger.is-entering > * {
+  animation: bpStaggerIn 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.home-stagger.is-entering > :nth-child(1) {
+  animation-delay: 0.04s;
+}
+
+.home-stagger.is-entering > :nth-child(2) {
+  animation-delay: 0.14s;
+}
+
+.home-stagger.is-entering > :nth-child(3) {
+  animation-delay: 0.22s;
+}
+
+.home-stagger.is-entering .support-card {
+  animation: bpStaggerIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(0.28s + var(--stagger-i, 0) * 26ms);
+}
+
+@keyframes bpStaggerIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 

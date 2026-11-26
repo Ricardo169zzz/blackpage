@@ -38,14 +38,20 @@ export function detectPlatform(raw) {
   const host = u.hostname.toLowerCase();
 
   if (/(^|\.)tiktok\.com$/.test(host)) return "tiktok";
+  if (/(^|\.)(douyin|iesdouyin)\.com$/.test(host)) return "douyin";
   if (/^(www\.|m\.|music\.)?(youtube\.com|youtu\.be)$/.test(host)) return "youtube";
   if (/^(open\.)?spotify\.com$/.test(host)) {
     return /\/playlist\//i.test(u.pathname) ? "spotify_playlist" : "spotify";
   }
   if (/^(www\.|m\.)?(instagram\.com|instagr\.am)$/.test(host)) return "instagram";
   if (/^(www\.|m\.|web\.|mbasic\.)?(facebook\.com|fb\.watch)$/.test(host)) return "facebook";
+  if (/(^|\.)threads\.(net|com)$/.test(host)) return "threads";
+  if (/(^|\.)(reddit\.com|redd\.it)$/.test(host)) return "reddit";
   if (/(^|\.)capcut\.com$/.test(host)) return "capcut";
   if (/^(www\.|id\.)?(pin\.it|pinterest\.[a-z.]+)$/.test(host)) return "pinterest";
+  if (/(^|\.)pixiv\.net$/.test(host)) return "pixiv";
+  if (/(^|\.)(bilibili\.(com|tv)|b23\.tv)$/.test(host)) return "bilibili";
+  if (/(^|\.)(xiaohongshu\.com|xhslink\.(com|cn)|rednote\.com)$/.test(host)) return "rednote";
   return null;
 }
 
@@ -56,7 +62,7 @@ export function renderUniversalBoxHtml(lang = "id") {
       <div class="dash-head" style="margin-bottom:10px;">
         <div>
           <h2 class="stage-title">${isEn ? "Paste Any Link" : "Tempel Link Otomatis"}</h2>
-          <p class="stage-desc">${isEn ? "Auto-detects TikTok, YouTube, Spotify, IG, FB, CapCut & Pinterest." : "Otomatis deteksi TikTok, YouTube, Spotify, IG, FB, CapCut & Pinterest."}</p>
+          <p class="stage-desc">${isEn ? "Auto-detects TikTok, Douyin, YouTube, Spotify, IG, FB, Threads, Reddit, Pixiv, Bilibili, RedNote, CapCut & Pinterest." : "Otomatis deteksi TikTok, Douyin, YouTube, Spotify, IG, FB, Threads, Reddit, Pixiv, Bilibili, RedNote, CapCut & Pinterest."}</p>
         </div>
         <span class="tag" id="uniDetectTag">AUTO</span>
       </div>
@@ -467,6 +473,60 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
               mediaType: it.isVideo ? "video" : "image",
               filename: `pinterest_${Date.now().toString().slice(-6)}.${it.isVideo ? "mp4" : "png"}`,
               galleryMeta: { url, author: "Pinterest", title: "Pinterest Video" },
+            });
+          },
+        });
+      } else if (["douyin", "threads", "reddit", "pixiv", "bilibili", "rednote"].includes(platform)) {
+        const res = await fetch(`${API_BASE}/api/${platform}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        if (!res.ok || !(data.downloads || []).length) {
+          throw new Error(data.message || `Gagal mengambil media ${platform.toUpperCase()}`);
+        }
+        const dls = data.downloads || [];
+        const vid = dls.find((d) => d.type === "video");
+        const imgs = dls.filter((d) => d.type === "image");
+        const aud = dls.find((d) => d.type === "audio");
+        const posterAttr = data.thumbnail
+          ? `poster="${escapeHtml(makeProxyUrl(API_BASE, data.thumbnail))}"`
+          : "";
+        const mediaHtml = vid
+          ? `<video class="video-preview" src="${escapeHtml(makeProxyUrl(API_BASE, vid.url))}" ${posterAttr} controls autoplay muted playsinline loop preload="auto"></video>`
+          : imgs.length
+            ? imgs
+                .map((im) => `<img class="thumb" src="${escapeHtml(makeProxyUrl(API_BASE, im.url))}" alt="${escapeHtml(platform)}" loading="lazy" />`)
+                .join("")
+            : aud
+              ? `<audio class="audio-preview" src="${escapeHtml(makeProxyUrl(API_BASE, aud.url))}" controls autoplay preload="auto"></audio>`
+              : "";
+
+        renderFrame({
+          badge: platform.toUpperCase(),
+          mediaHtml,
+          author: data.author || platform.toUpperCase(),
+          title: data.title,
+          actionsHtml: dls
+            .map((dl, i) => {
+              const kind = dl.type === "audio" ? "MP3" : dl.type === "image" ? "Foto" : "MP4";
+              return `<button type="button" class="${i === 0 ? "btn btn-success" : "btn"}" data-uni-dl="${i}">Unduh ${kind} (${escapeHtml(dl.quality)})</button>`;
+            })
+            .join(""),
+          onDownload: (btn, idx) => {
+            const dl = dls[idx];
+            const ext = dl.type === "audio" ? "mp3" : dl.type === "image" ? "jpg" : "mp4";
+            triggerDownload(btn, {
+              remoteUrl: dl.url,
+              mediaType: dl.type,
+              filename: `${platform}_${Date.now().toString().slice(-6)}.${ext}`,
+              galleryMeta: {
+                url,
+                author: data.author,
+                title: data.title || url,
+                thumbnail: data.thumbnail,
+              },
             });
           },
         });

@@ -75,12 +75,12 @@ function applyTheme(mode = getThemeMode()) {
   if (meta) meta.setAttribute("content", color);
   try {
     window.BlackpageNative?.setSystemBarsDark?.(isDark);
-  } catch {}
+  } catch { }
   try {
     const sb = window.Capacitor?.Plugins?.StatusBar;
     sb?.setStyle?.({ style: isDark ? "DARK" : "LIGHT" });
     sb?.setBackgroundColor?.({ color });
-  } catch {}
+  } catch { }
 }
 
 systemDarkMq.addEventListener("change", () => {
@@ -189,15 +189,27 @@ const TTS_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" str
 const NOKIA_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><rect x="8" y="5" width="8" height="6"/><path d="M9 15h.01M12 15h.01M15 15h.01M9 18h.01M12 18h.01M15 18h.01"/></svg>`;
 const IQC_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>`;
 const AIO_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+const DOUYIN_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/><circle cx="18" cy="5" r="1.5" fill="currentColor" stroke="none"/></svg>`;
+const THREADS_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>`;
+const REDDIT_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="14" r="7"/><path d="M12 7l2-4 3 1"/><circle cx="9.5" cy="13.5" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="13.5" r="1" fill="currentColor" stroke="none"/><path d="M9.5 16.5a4 4 0 0 0 5 0"/></svg>`;
+const PIXIV_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 20V5h6.5a5.5 5.5 0 0 1 0 11H7"/><path d="M5 20h4"/></svg>`;
+const BILIBILI_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 3l2.5 3M16 3l-2.5 3M9 12v2M15 12v2"/></svg>`;
+const REDNOTE_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5M8 17h7"/></svg>`;
 
 const SUPPORT_DOWNLOADERS = [
   { id: "tiktok-dl", shortName: "TikTok", icon: TIKTOK_SVG, color: "card-yellow" },
+  { id: "douyin-dl", shortName: "Douyin", icon: DOUYIN_SVG, color: "card-yellow" },
   { id: "youtube-dl", shortName: "YouTube", icon: YOUTUBE_SVG, color: "card-yellow" },
   { id: "spotify-dl", shortName: "Spotify", icon: SPOTIFY_SVG, color: "card-yellow" },
   { id: "instagram-dl", shortName: "Instagram", icon: INSTAGRAM_SVG, color: "card-yellow" },
   { id: "facebook-dl", shortName: "Facebook", icon: FACEBOOK_SVG, color: "card-yellow" },
+  { id: "threads-dl", shortName: "Threads", icon: THREADS_SVG, color: "card-yellow" },
+  { id: "reddit-dl", shortName: "Reddit", icon: REDDIT_SVG, color: "card-yellow" },
   { id: "capcut-dl", shortName: "CapCut", icon: CAPCUT_SVG, color: "card-yellow" },
   { id: "pinterest-dl", shortName: "Pinterest", icon: PINTEREST_SVG, color: "card-yellow" },
+  { id: "pixiv-dl", shortName: "Pixiv", icon: PIXIV_SVG, color: "card-yellow" },
+  { id: "bilibili-dl", shortName: "Bilibili", icon: BILIBILI_SVG, color: "card-yellow" },
+  { id: "rednote-dl", shortName: "RedNote", icon: REDNOTE_SVG, color: "card-yellow" },
   { id: "aio-dl", shortName: "All Link", icon: AIO_SVG, color: "card-yellow" },
 ];
 
@@ -234,7 +246,7 @@ const TOOLS = [
     ...ttsTool,
     shortName: "TTS Suara",
     icon: TTS_SVG,
-    category: "Utility",
+    category: "MP3 & Audio",
     color: "card-cyan",
   },
   {
@@ -242,10 +254,11 @@ const TOOLS = [
     name: "AI Assistant",
     shortName: "AI",
     icon: "AI",
-    category: "AI",
+    category: "AI & Utility",
     color: "card-cyan",
     badge: "SOON",
     disabled: true,
+    desc: "Asisten AI serba guna (segera hadir).",
     render: () => "",
   },
   {
@@ -253,20 +266,29 @@ const TOOLS = [
     name: "Utility Pack",
     shortName: "Utility",
     icon: "UT",
-    category: "Utility",
+    category: "AI & Utility",
     color: "card-white",
     badge: "SOON",
     disabled: true,
+    desc: "Kumpulan utilitas tambahan (segera hadir).",
     render: () => "",
   },
 ];
 
-const CATEGORIES = ["Semua", ...new Set(TOOLS.map((t) => t.category))];
+const TOOL_GROUPS = [
+  { id: "Sticker", label: "Sticker", desc: "Buat stiker & kutipan cepat", icon: BRAT_SVG, color: "card-yellow" },
+  { id: "MP3 & Audio", label: "MP3 & Audio", desc: "Konversi teks & olah audio", icon: TTS_SVG, color: "card-cyan" },
+  { id: "AI & Utility", label: "AI & Utility", desc: "Asisten & utilitas tambahan", icon: "UT", color: "card-white" },
+];
 
 let activePage = "home"; // "home" | "tools" | "gallery" | "gallery:<idx>" | "settings" | "settings:<id>" | "tool:<id>"
+let prevPage = "home";
 let searchQuery = "";
-let activeCategory = "Semua";
+let openToolGroup = null;
 let galleryFilter = "ALL"; // "ALL" | "VIDEO" | "MP3"
+let hasPlayedHomeStagger = false;
+let activeStageAnim = null;
+let comicController = null;
 
 const navEl = document.getElementById("toolNav");
 const stageEl = document.getElementById("toolStage");
@@ -276,17 +298,39 @@ function applyMotionPref() {
   document.documentElement.dataset.motion = getPrefs().reduceMotion ? "reduced" : "normal";
 }
 
+const TAB_ORDER = { home: 0, tools: 1, gallery: 2, settings: 3 };
+const isSubPage = (p) =>
+  p === "comic" || p.startsWith("tool:") || p.startsWith("gallery:") || p.startsWith("settings:");
+
 function playPageEnter() {
   if (getPrefs().reduceMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  if (typeof stageEl.animate === "function") {
-    stageEl.animate(
-      [
-        { opacity: 0, transform: "translate3d(0, 10px, 0)" },
-        { opacity: 1, transform: "translate3d(0, 0, 0)" },
-      ],
-      { duration: 180, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }
-    );
+  if (typeof stageEl.animate !== "function") return;
+
+  activeStageAnim?.cancel();
+  const from = prevPage;
+  const to = activePage;
+  let fromTransform = "translate3d(0, 14px, 0) scale(0.985)";
+  let duration = 260;
+
+  if (isSubPage(to) && !isSubPage(from)) {
+    fromTransform = "translate3d(0, 16px, 0) scale(0.965)";
+    duration = 280;
+  } else if (!isSubPage(to) && isSubPage(from)) {
+    fromTransform = "translate3d(-18px, 0, 0) scale(1.015)";
+    duration = 250;
+  } else if (TAB_ORDER[from] !== undefined && TAB_ORDER[to] !== undefined && from !== to) {
+    const dir = TAB_ORDER[to] > TAB_ORDER[from] ? 1 : -1;
+    fromTransform = `translate3d(${dir * 26}px, 0, 0) scale(0.992)`;
   }
+
+  activeStageAnim = stageEl.animate(
+    [
+      { opacity: 0, transform: fromTransform },
+      { opacity: 1, transform: "translate3d(0, 0, 0) scale(1)" },
+    ],
+    { duration, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+  );
+  prevPage = to;
 }
 
 applyMotionPref();
@@ -306,6 +350,9 @@ function bindThumbLoaders(container) {
 }
 
 function renderNav() {
+  if (activePage !== "home") {
+    stageEl.classList.remove("home-stagger", "is-waiting", "is-entering");
+  }
   const isHome = activePage === "home";
   const isTools = activePage === "tools" || activePage.startsWith("tool:");
   const isGallery = activePage === "gallery" || activePage.startsWith("gallery:");
@@ -327,49 +374,76 @@ function renderNav() {
   `;
 }
 
-function getFilteredTools() {
-  const q = searchQuery.trim().toLowerCase();
-  return TOOLS.filter((t) => {
-    const matchCat = activeCategory === "Semua" || t.category === activeCategory;
-    const matchText =
-      !q ||
-      t.name.toLowerCase().includes(q) ||
-      t.category.toLowerCase().includes(q) ||
-      t.desc.toLowerCase().includes(q);
-    return matchCat && matchText;
-  });
-}
-
-function renderToolListHtml() {
-  const filtered = getFilteredTools();
-  if (!filtered.length) {
-    return `<div class="alert alert-info">Tidak ada tool di kategori "${escapeHtml(activeCategory)}" untuk "${escapeHtml(searchQuery)}".</div>`;
-  }
-
-  return filtered
+function renderToolCardsHtml(items) {
+  return items
     .map(
-      (t) => `
+      (tool, idx) => `
       <button
         type="button"
-        class="tool-card ${t.color || "card-white"}"
-        data-open-tool="${t.id}"
-        ${t.disabled ? "disabled" : ""}
+        class="tool-card tool-stagger-item ${tool.color || "card-white"}"
+        style="--stagger-i:${idx};"
+        data-open-tool="${tool.id}"
+        ${tool.disabled ? "disabled" : ""}
       >
-        <span class="tool-icon">${t.icon || "OP"}</span>
+        <span class="tool-icon">${tool.icon || "OP"}</span>
         <div class="tool-card-body">
-          <h3 class="tool-card-title">${escapeHtml(t.shortName || t.name)}</h3>
-          ${t.disabled ? `<span class="tag soon">${escapeHtml(t.badge)}</span>` : ""}
+          <h3 class="tool-card-title">${escapeHtml(tool.shortName || tool.name)}</h3>
+          ${tool.desc ? `<p class="tool-card-desc">${escapeHtml(tool.desc)}</p>` : ""}
         </div>
+        ${tool.disabled ? `<span class="tag soon">${escapeHtml(tool.badge)}</span>` : `<span class="tool-arrow" aria-hidden="true">&rarr;</span>`}
       </button>
     `
     )
     .join("");
 }
 
+function renderToolsAreaHtml() {
+  const q = searchQuery.trim().toLowerCase();
+  if (q) {
+    const matched = TOOLS.filter(
+      (tool) =>
+        tool.name.toLowerCase().includes(q) ||
+        tool.category.toLowerCase().includes(q) ||
+        (tool.desc || "").toLowerCase().includes(q)
+    );
+    if (!matched.length) {
+      return `<div class="alert alert-info">Tidak ada tool untuk "${escapeHtml(searchQuery)}".</div>`;
+    }
+    return `<div class="tool-list">${renderToolCardsHtml(matched)}</div>`;
+  }
+
+  return `<div class="tool-cat-list">${TOOL_GROUPS.map((group) => {
+    const items = TOOLS.filter((tool) => tool.category === group.id);
+    const activeCount = items.filter((tool) => !tool.disabled).length;
+    const isOpen = openToolGroup === group.id;
+    return `
+      <div class="tool-cat-wrap ${isOpen ? "is-open" : ""}">
+        <button
+          type="button"
+          class="tool-card tool-cat-btn ${group.color}"
+          data-toggle-cat="${escapeHtml(group.id)}"
+          aria-expanded="${isOpen ? "true" : "false"}"
+        >
+          <span class="tool-icon">${group.icon}</span>
+          <div class="tool-card-body">
+            <h3 class="tool-card-title">${escapeHtml(group.label)}</h3>
+            <p class="tool-card-desc">${escapeHtml(group.desc)}</p>
+          </div>
+          <div class="tool-cat-meta">
+            <span class="tag">${activeCount} AKTIF</span>
+            <span class="tool-cat-chevron" aria-hidden="true">&#9662;</span>
+          </div>
+        </button>
+        ${isOpen ? `<div class="tool-cat-panel">${renderToolCardsHtml(items)}</div>` : ""}
+      </div>
+    `;
+  }).join("")}</div>`;
+}
+
 function renderSupportDownloadersHtml() {
   return SUPPORT_DOWNLOADERS.map(
-    (d) => `
-      <button type="button" class="tool-card support-card ${d.color}">
+    (d, idx) => `
+      <button type="button" class="tool-card support-card ${d.color}" style="--stagger-i:${idx};">
         <span class="tool-icon">${d.icon}</span>
         <div class="tool-card-body">
           <h3 class="tool-card-title">${escapeHtml(d.shortName)}</h3>
@@ -379,23 +453,9 @@ function renderSupportDownloadersHtml() {
   ).join("");
 }
 
-function renderCategoryBarHtml() {
-  return CATEGORIES.map(
-    (cat) => `
-      <button
-        type="button"
-        class="cat-pill ${cat === activeCategory ? "active" : ""}"
-        data-cat="${escapeHtml(cat)}"
-      >
-        ${escapeHtml(cat)}
-      </button>
-    `
-  ).join("");
-}
-
 function pushRoute(page, fromPopstate = false) {
   if (!fromPopstate && history.state?.page !== page) {
-    history.pushState({ page }, "");
+    history.pushState(page === "comic" ? { page, comicView: "search" } : { page }, "");
   }
 }
 
@@ -410,17 +470,9 @@ function renderHome(fromPopstate = false) {
       ${renderUniversalBoxHtml(getLang())}
     </div>
 
-    <div class="panel-card">
-      <div class="support-head" style="border-top:0;padding-top:0;">
-        <div class="field-label" style="margin:0;">SUPPORT TOOLS</div>
-        <span class="tag">${SUPPORT_DOWNLOADERS.length} AKTIF</span>
-      </div>
-      <div class="tool-list tool-grid-2">${renderSupportDownloadersHtml()}</div>
-    </div>
-
     <button type="button" class="comic-hero-btn" id="openComicBtn">
       <span class="comic-hero-icon" aria-hidden="true">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"><path d="M2 4h8a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2z"/><path d="M22 4h-8a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h9z"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"><path d="M2 4h8a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2z"/><path d="M22 4h-8a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h9z"/></svg>
       </span>
       <span class="comic-hero-text">
         <strong>BACA KOMIK</strong>
@@ -428,8 +480,27 @@ function renderHome(fromPopstate = false) {
       </span>
       <span class="tag comic-hero-pill">BUKA &rarr;</span>
     </button>
+
+    <div class="panel-card">
+      <div class="support-head" style="border-top:0;padding-top:0;">
+        <div class="field-label" style="margin:0;">SUPPORT TOOLS</div>
+        <span class="tag">${SUPPORT_DOWNLOADERS.length} AKTIF</span>
+      </div>
+      <div class="tool-list tool-grid-3">${renderSupportDownloadersHtml()}</div>
+    </div>
   `;
-  playPageEnter();
+  stageEl.classList.remove("home-stagger", "is-waiting", "is-entering");
+  const shouldStagger =
+    !hasPlayedHomeStagger &&
+    !getPrefs().reduceMotion &&
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (shouldStagger) {
+    hasPlayedHomeStagger = true;
+    const introPending = Boolean(document.getElementById("bpIntro"));
+    stageEl.classList.add("home-stagger", introPending ? "is-waiting" : "is-entering");
+  } else {
+    playPageEnter();
+  }
 
   initUniversalBox(stageEl, { API_BASE: getApiBase(), escapeHtml, prefs: getPrefs() });
   stageEl.querySelector("#openComicBtn")?.addEventListener("click", () => mountComicPage());
@@ -440,7 +511,7 @@ function mountComicPage(fromPopstate = false) {
   pushRoute("comic", fromPopstate);
   renderNav();
   stageEl.classList.remove("stage-split");
-  mountComicReader(stageEl, {
+  comicController = mountComicReader(stageEl, {
     API_BASE: getApiBase(),
     escapeHtml,
     onBackHome: () => navigate("home"),
@@ -471,26 +542,92 @@ function renderToolsPage(fromPopstate = false) {
       value="${escapeHtml(searchQuery)}"
     />
 
-    <div class="cat-bar" id="catBar">${renderCategoryBarHtml()}</div>
-    <div class="tool-list tool-grid-2" id="toolList">${renderToolListHtml()}</div>
+    <div id="toolList">${renderToolsAreaHtml()}</div>
   `;
   playPageEnter();
 
   const searchEl = stageEl.querySelector("#toolSearch");
-  const catBarEl = stageEl.querySelector("#catBar");
   const listEl = stageEl.querySelector("#toolList");
+  let closeTimer = null;
+  let stageHeightAnim = null;
+
+  function captureCatTops() {
+    const map = new Map();
+    listEl.querySelectorAll("[data-toggle-cat]").forEach((btn) => {
+      map.set(btn.dataset.toggleCat, btn.getBoundingClientRect().top);
+    });
+    return map;
+  }
+
+  function applyCatFlip(beforeTops) {
+    if (!beforeTops?.size) return;
+    listEl.querySelectorAll("[data-toggle-cat]").forEach((btn) => {
+      const prevTop = beforeTops.get(btn.dataset.toggleCat);
+      if (prevTop === undefined || typeof btn.animate !== "function") return;
+      const dy = prevTop - btn.getBoundingClientRect().top;
+      if (Math.abs(dy) < 1) return;
+      btn.animate(
+        [
+          { transform: `translate3d(0, ${dy}px, 0)` },
+          { transform: "translate3d(0, 0, 0)" },
+        ],
+        { duration: 240, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+      );
+    });
+  }
 
   searchEl.addEventListener("input", (e) => {
+    clearTimeout(closeTimer);
     searchQuery = e.target.value;
-    listEl.innerHTML = renderToolListHtml();
+    listEl.innerHTML = renderToolsAreaHtml();
   });
 
-  catBarEl.addEventListener("click", (e) => {
-    const pill = e.target.closest("[data-cat]");
-    if (!pill) return;
-    activeCategory = pill.dataset.cat;
-    catBarEl.innerHTML = renderCategoryBarHtml();
-    listEl.innerHTML = renderToolListHtml();
+  listEl.addEventListener("click", (e) => {
+    const catBtn = e.target.closest("[data-toggle-cat]");
+    if (!catBtn) return;
+    clearTimeout(closeTimer);
+
+    const catId = catBtn.dataset.toggleCat;
+    const nextGroup = openToolGroup === catId ? null : catId;
+    const openWrap = listEl.querySelector(".tool-cat-wrap.is-open");
+    const reduce = getPrefs().reduceMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const commitToggle = () => {
+      const prevHeight = reduce ? 0 : stageEl.offsetHeight;
+      const beforeTops = reduce ? null : captureCatTops();
+      openToolGroup = nextGroup;
+      listEl.innerHTML = renderToolsAreaHtml();
+      if (!reduce) {
+        applyCatFlip(beforeTops);
+        const nextHeight = stageEl.offsetHeight;
+        if (Math.abs(prevHeight - nextHeight) > 1 && typeof stageEl.animate === "function") {
+          stageHeightAnim?.cancel();
+          stageEl.style.overflow = "hidden";
+          stageHeightAnim = stageEl.animate(
+            [{ height: `${prevHeight}px` }, { height: `${nextHeight}px` }],
+            { duration: 240, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+          );
+          const clearOverflow = () => {
+            stageEl.style.overflow = "";
+          };
+          stageHeightAnim.onfinish = clearOverflow;
+          stageHeightAnim.oncancel = clearOverflow;
+        }
+      }
+    };
+
+    if (openWrap && !reduce) {
+      const items = [...openWrap.querySelectorAll(".tool-stagger-item")];
+      items.forEach((el, idx) => {
+        el.style.setProperty("--exit-i", String(items.length - 1 - idx));
+      });
+      openWrap.classList.add("is-closing");
+      const waitMs = Math.min(240, 165 + Math.max(0, items.length - 1) * 24);
+      closeTimer = setTimeout(commitToggle, waitMs);
+      return;
+    }
+
+    commitToggle();
   });
 }
 
@@ -607,6 +744,23 @@ function renderGallery(fromPopstate = false) {
   }
 }
 
+async function resolveOfflineMediaSrc(item) {
+  const cap = window.Capacitor;
+  const fs = cap?.Plugins?.Filesystem;
+  if (!cap?.isNativePlatform?.() || !fs || !item?.filename) return "";
+  const subDir = item.mediaType === "audio" ? "audio" : item.mediaType === "image" ? "image" : "video";
+  const path = `Download/Blackpage/${subDir}/${item.filename}`;
+  try {
+    await fs.stat({ path, directory: "EXTERNAL_STORAGE" });
+    const res = await fs.getUri({ path, directory: "EXTERNAL_STORAGE" });
+    const uri = res?.uri || "";
+    if (!uri) return "";
+    return typeof cap.convertFileSrc === "function" ? cap.convertFileSrc(uri) : uri;
+  } catch {
+    return "";
+  }
+}
+
 function renderGalleryDetail(idx, fromPopstate = false) {
   const items = loadGalleryItems();
   const item = items[idx];
@@ -647,7 +801,10 @@ function renderGalleryDetail(idx, fromPopstate = false) {
   stageEl.innerHTML = `
     <div class="tool-topbar">
       <button type="button" class="btn btn-sm" data-page="gallery">← Kembali ke Galeri</button>
-      <span class="tag">${isAudio ? "MP3" : "VIDEO"}</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span class="tag" id="galOfflineTag" hidden>OFFLINE</span>
+        <span class="tag">${isAudio ? "MP3" : "VIDEO"}</span>
+      </div>
     </div>
 
     <article class="result-card">
@@ -686,6 +843,8 @@ function renderGalleryDetail(idx, fromPopstate = false) {
 
   const videoWrap = stageEl.querySelector("#galVideoWrap");
   const videoEl = stageEl.querySelector("video.video-preview");
+  const audioEl = stageEl.querySelector("audio.audio-preview");
+  const offlineTag = stageEl.querySelector("#galOfflineTag");
   playPageEnter();
   if (videoEl) {
     const finishLoad = () => videoWrap && videoWrap.classList.remove("is-loading");
@@ -694,6 +853,16 @@ function renderGalleryDetail(idx, fromPopstate = false) {
     videoEl.addEventListener("error", finishLoad, { once: true });
     videoEl.play().catch(() => { });
   }
+
+  resolveOfflineMediaSrc(item).then((localSrc) => {
+    if (!localSrc || !stageEl.isConnected) return;
+    const mediaEl = videoEl || audioEl;
+    if (!mediaEl || !mediaEl.isConnected) return;
+    if (offlineTag) offlineTag.hidden = false;
+    mediaEl.src = localSrc;
+    mediaEl.load?.();
+    mediaEl.play?.().catch(() => { });
+  });
 
   const copyAllBtn = stageEl.querySelector("#galCopyAll");
   const copySelBtn = stageEl.querySelector("#galCopySel");
@@ -808,7 +977,7 @@ function renderSettings(fromPopstate = false) {
         <h2 class="stage-title">${escapeHtml(t("settings_title"))}</h2>
         <p class="stage-desc">${escapeHtml(t("settings_desc"))}</p>
       </div>
-      <span class="tag">V1.0</span>
+      <span class="tag">V${APP_VERSION}</span>
     </div>
     <div class="tool-list">${menuHtml}</div>
   `;
@@ -1239,6 +1408,7 @@ function mountTool(id, prefillUrl = "", fromPopstate = false) {
 
 function navigate(page, fromPopstate = false) {
   document.querySelectorAll(".comic-float-back, .comic-as-float").forEach((n) => n.remove());
+  if (page !== "comic") comicController = null;
   if (page === "home") renderHome(fromPopstate);
   else if (page === "tools") renderToolsPage(fromPopstate);
   else if (page === "gallery") renderGallery(fromPopstate);
@@ -1251,7 +1421,14 @@ function navigate(page, fromPopstate = false) {
 }
 
 window.addEventListener("popstate", (e) => {
-  navigate(e.state?.page || "home", true);
+  const nextPage = e.state?.page || "home";
+  if (nextPage === "comic" && activePage === "comic" && comicController) {
+    document.querySelectorAll(".comic-float-back, .comic-as-float").forEach((n) => n.remove());
+    comicController.syncView(e.state?.comicView || "search");
+    playPageEnter();
+    return;
+  }
+  navigate(nextPage, true);
 });
 
 let lastBackPressAt = 0;
@@ -1342,7 +1519,7 @@ async function checkAppUpdate() {
       const info = await healthRes.json();
       if (info?.version) latest = String(info.version).replace(/^v/i, "");
     }
-  } catch {}
+  } catch { }
 
   const hasUpdate = Boolean(latest && compareSemver(latest, APP_VERSION) > 0);
   latestUpdateInfo = { latest: latest || APP_VERSION, hasUpdate, url };
@@ -1379,7 +1556,14 @@ if (bpIntroEl) {
   setTimeout(
     () => {
       bpIntroEl.classList.add("is-exit");
-      setTimeout(() => bpIntroEl.remove(), 700);
+      if (activePage === "home" && stageEl.classList.contains("is-waiting")) {
+        stageEl.classList.remove("is-waiting");
+        stageEl.classList.add("is-entering");
+      }
+      setTimeout(() => {
+        bpIntroEl.remove();
+        stageEl.classList.remove("home-stagger", "is-entering");
+      }, 900);
     },
     reduce ? 50 : 1400
   );

@@ -96,6 +96,28 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
     }
   }
 
+  function pushComicView(comicView) {
+    if (history.state?.page === "comic" && history.state?.comicView !== comicView) {
+      history.pushState({ page: "comic", comicView }, "");
+    }
+  }
+
+  function goBackToSearch() {
+    if (history.state?.page === "comic" && history.state?.comicView === "detail") {
+      history.back();
+    } else {
+      renderSearchView();
+    }
+  }
+
+  function goBackToDetail() {
+    if (history.state?.page === "comic" && history.state?.comicView === "read") {
+      history.back();
+    } else {
+      renderComicDetail();
+    }
+  }
+
   function renderAutoScrollCardHtml() {
     const preset = SPEED_PRESETS[asPrefs.speedIdx] || SPEED_PRESETS[1];
     return `
@@ -148,7 +170,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       .slice(0, 20)
       .map(
         (item, i) => `
-      <button type="button" class="comic-card" data-comic-idx="${i}">
+      <button type="button" class="comic-card" data-comic-idx="${i}" style="--comic-i:${Math.min(i, 11)};">
         <div class="comic-cover-wrap">
           ${
             item.thumbnail
@@ -351,6 +373,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
 
   async function openComicDetail(item) {
     cleanupReaderWidgets();
+    pushComicView("detail");
     chapterQuery = "";
     chapterPage = 1;
     stageEl.innerHTML = `
@@ -367,7 +390,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
         </div>
       </div>
     `;
-    stageEl.querySelector("#comicBackSearch")?.addEventListener("click", () => renderSearchView());
+    stageEl.querySelector("#comicBackSearch")?.addEventListener("click", goBackToSearch);
 
     try {
       const res = await fetch(`${API_BASE}/api/comic/detail`, {
@@ -384,7 +407,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
         <button type="button" class="btn btn-sm" id="comicBackSearch" style="margin-bottom:10px;">&larr; Daftar Komik</button>
         <div class="panel-card"><div class="alert alert-error">${escapeHtml(err.message || "Gagal membuka komik.")}</div></div>
       `;
-      stageEl.querySelector("#comicBackSearch")?.addEventListener("click", () => renderSearchView());
+      stageEl.querySelector("#comicBackSearch")?.addEventListener("click", goBackToSearch);
     }
   }
 
@@ -441,8 +464,8 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
             paged.length
               ? paged
                   .map(
-                    ({ ch, idx }) => `
-                  <button type="button" class="comic-chapter-btn" data-ch-idx="${idx}">
+                    ({ ch, idx }, pos) => `
+                  <button type="button" class="comic-chapter-btn" data-ch-idx="${idx}" style="--comic-i:${Math.min(pos, 12)};">
                     <span>${escapeHtml(ch.title)}</span>
                     <span class="tag">BACA</span>
                   </button>
@@ -465,7 +488,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       </div>
     `;
 
-    stageEl.querySelector("#comicBackSearch")?.addEventListener("click", () => renderSearchView());
+    stageEl.querySelector("#comicBackSearch")?.addEventListener("click", goBackToSearch);
     stageEl.querySelector("#comicSortBtn")?.addEventListener("click", () => {
       sortAsc = !sortAsc;
       chapterPage = 1;
@@ -505,6 +528,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
     cleanupReaderWidgets();
     const ch = currentComic?.chapters?.[chIdx];
     if (!ch) return;
+    pushComicView("read");
     const workspace = stageEl.closest(".workspace");
     if (workspace) workspace.scrollTop = 0;
 
@@ -512,7 +536,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       <button type="button" class="btn btn-sm" id="comicBackDetail" style="margin-bottom:10px;">&larr; Daftar Chapter</button>
       <div class="panel-card"><div class="alert alert-info">Memuat halaman ${escapeHtml(ch.title)}...</div></div>
     `;
-    stageEl.querySelector("#comicBackDetail")?.addEventListener("click", renderComicDetail);
+    stageEl.querySelector("#comicBackDetail")?.addEventListener("click", goBackToDetail);
 
     try {
       const res = await fetch(`${API_BASE}/api/comic/read`, {
@@ -560,7 +584,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       floatBack.className = "comic-float-back";
       floatBack.innerHTML = `&larr; Kembali`;
       appShell.appendChild(floatBack);
-      floatBack.addEventListener("click", renderComicDetail);
+      floatBack.addEventListener("click", goBackToDetail);
 
       let io = null;
       const onScrollCheck = () => {
@@ -728,6 +752,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
           activeWorkers += 1;
           const url = img.dataset.pageSrc;
           const finish = () => {
+            img.classList.add("is-loaded");
             activeWorkers -= 1;
             pumpPages();
           };
@@ -754,7 +779,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       };
       pumpPages();
 
-      topBackBtn?.addEventListener("click", renderComicDetail);
+      topBackBtn?.addEventListener("click", goBackToDetail);
       stageEl.querySelectorAll("[data-nav-ch]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const nextIdx = Number(btn.dataset.navCh);
@@ -768,9 +793,15 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
         <button type="button" class="btn btn-sm" id="comicBackDetail" style="margin-bottom:10px;">&larr; Daftar Chapter</button>
         <div class="panel-card"><div class="alert alert-error">${escapeHtml(err.message || "Gagal memuat chapter.")}</div></div>
       `;
-      stageEl.querySelector("#comicBackDetail")?.addEventListener("click", renderComicDetail);
+      stageEl.querySelector("#comicBackDetail")?.addEventListener("click", goBackToDetail);
     }
   }
 
   renderSearchView();
+  return {
+    syncView(comicView) {
+      if (comicView === "detail" && currentComic) renderComicDetail();
+      else renderSearchView();
+    },
+  };
 }
