@@ -1,5 +1,9 @@
 node_modules/
 android/
+assets/
+dist/
+build/
 .env
+.env.*
 *.log
 .DS_Store
