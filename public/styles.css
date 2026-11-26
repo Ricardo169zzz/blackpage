@@ -1889,18 +1889,23 @@ body::before {
   transform: rotate(-45deg) translateY(-1px);
 }
 
-/* Minimalist Cinematic App Intro */
+/* Minimalist Cinematic App Intro (Light & Dark Theme-Aware) */
 .bp-intro {
   position: absolute;
   inset: 0;
   z-index: 120;
-  background: #0a0a0b;
-  color: #faf7f0;
+  background: var(--paper, #f2ede2);
+  color: var(--ink, #141414);
   display: grid;
   place-items: center;
   clip-path: inset(0 0 0 0);
   opacity: 1;
   transition: clip-path 0.65s var(--ease), opacity 0.5s ease;
+}
+
+:root[data-theme="dark"] .bp-intro {
+  background: #0a0a0b;
+  color: #faf7f0;
 }
 
 .bp-intro.is-exit {
@@ -1922,6 +1927,8 @@ body::before {
   clip-path: inset(100% 0 0 0);
   transform: translateY(10px) scale(1.04);
   animation: bpLogoIn 0.75s var(--ease) 0.1s forwards;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+  border-radius: 18px;
 }
 
 .intro-logo-box img {
@@ -2006,6 +2013,29 @@ body::before {
   width: 100%;
   max-height: 68vh;
   object-fit: contain;
+}
+
+.bp-exit-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 76px;
+  transform: translateX(-50%);
+  z-index: 110;
+  padding: 8px 14px;
+  background: var(--ink);
+  color: var(--surface);
+  border: 2px solid var(--ink);
+  box-shadow: var(--shadow-ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: bpExitToastIn 0.2s var(--ease);
+}
+
+@keyframes bpExitToastIn {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {

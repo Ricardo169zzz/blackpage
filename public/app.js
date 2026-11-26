@@ -1254,11 +1254,38 @@ window.addEventListener("popstate", (e) => {
   navigate(e.state?.page || "home", true);
 });
 
+let lastBackPressAt = 0;
+let exitToastTimer = null;
+
+function showExitToast() {
+  document.querySelector("#bpExitToast")?.remove();
+  clearTimeout(exitToastTimer);
+  const host = document.querySelector(".app-shell") || document.body;
+  const el = document.createElement("div");
+  el.id = "bpExitToast";
+  el.className = "bp-exit-toast";
+  el.textContent = getLang() === "en" ? "Press back again to exit" : "Tekan sekali lagi untuk keluar";
+  host.appendChild(el);
+  exitToastTimer = setTimeout(() => el.remove(), 2000);
+}
+
 window.Capacitor?.Plugins?.App?.addListener?.("backButton", () => {
+  const modal = document.querySelector("#bpStickerLightbox, #comicAsTipModal");
+  if (modal) {
+    modal.remove();
+    return;
+  }
   if (activePage !== "home") {
     history.back();
-  } else {
+    return;
+  }
+  const now = Date.now();
+  if (now - lastBackPressAt < 2000) {
+    document.querySelector("#bpExitToast")?.remove();
     window.Capacitor.Plugins.App.exitApp?.();
+  } else {
+    lastBackPressAt = now;
+    showExitToast();
   }
 });
 
