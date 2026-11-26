@@ -2,6 +2,15 @@
 
 Semua perubahan penting pada proyek **Blackpage** dicatat di file ini.
 
+## [1.4.0] — 2026-11-26
+
+### Fitur Baru
+- **Baca Komik Multi-Server & Auto-Scroll**:
+  - Mendukung `Auto (Semua Server)` + pemilih server (`Komikindo`, `Bacakomik`, `Kiryuu`, `Komiku`, `Manhwaindo`, `Komikcast`, `MangaDex`), paginasi 20 komik (`← Prev` / `Next →`), search chapter + paginasi 20 chapter, loading skeleton, dan reader throttled 2-concurrent agar bebas `403`.
+  - Fitur **Auto Scroll** (`Pelan`, `Sedang`, `Cepat`, `Kilat`) berbasis `requestAnimationFrame`, pop-up tips dengan checkbox *Jangan ingatkan lagi*, pill kontrol kiri bawah saat membaca, dan tombol **← Kembali** mengambang smooth di kanan bawah saat scroll.
+- **Animasi Intro Minimalis & Sinkronisasi Tema Bar Android**: Overlay intro `logo.png` + `BLACKPAGE` saat masuk aplikasi, serta sinkronisasi warna Navigation Bar (tombol Back) & Status Bar Android via `MainActivity.java` bridge.
+- **Logo Baru & Tools Sticker Baru**: Pemasangan `public/logo.png` untuk web & ikon APK, penambahan **Nokia SMS** ([public/tools/nokia.js](file:///e:/TOOLS%20OP/public/tools/nokia.js)) dan **IQC Quote** ([public/tools/iqc.js](file:///e:/TOOLS%20OP/public/tools/iqc.js)), serta lightbox foto full dengan bingkai galeri Bauhaus pada semua tools Sticker.
+
 ## [1.3.0] — 2026-11-26
 
 ### Fitur Baru

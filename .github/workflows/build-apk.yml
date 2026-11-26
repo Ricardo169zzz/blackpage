@@ -44,54 +44,62 @@ jobs:
       - name: Install Capacitor & Plugins
         run: |
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/app@6 @capacitor/filesystem@6
-          npm install --no-save @capacitor/assets @resvg/resvg-js
+          npm install --no-save @capacitor/assets sharp
 
-      - name: Generate Android App Icon & Splash from SVG
+      - name: Generate Android App Icon & Splash from logo.png
         run: |
           node -e '
             const fs = require("fs");
-            const { Resvg } = require("@resvg/resvg-js");
-            fs.mkdirSync("assets", { recursive: true });
-            const svg = fs.readFileSync("public/icon.svg", "utf8");
-            const iconPng = new Resvg(svg, { fitTo: { mode: "width", value: 1024 } }).render().asPng();
-            fs.writeFileSync("assets/icon-only.png", iconPng);
-            const fgSvg = svg.replace(/<rect[^>]*fill="#141414"[^>]*\/>/, "");
-            fs.writeFileSync("assets/icon-foreground.png", new Resvg(fgSvg, { fitTo: { mode: "width", value: 1024 } }).render().asPng());
-            const bgSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#141414"/></svg>`;
-            fs.writeFileSync("assets/icon-background.png", new Resvg(bgSvg).render().asPng());
-            const splashSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732" width="2732" height="2732"><rect width="2732" height="2732" fill="#141414"/><g transform="translate(854, 854) scale(1)">${svg.replace(/<\/?svg[^>]*>/g, "")}</g></svg>`;
-            fs.writeFileSync("assets/splash.png", new Resvg(splashSvg, { fitTo: { mode: "width", value: 2732 } }).render().asPng());
+            const sharp = require("sharp");
+            (async () => {
+              fs.mkdirSync("assets", { recursive: true });
+              await sharp("public/logo.png").resize(1024, 1024, { fit: "cover" }).png().toFile("assets/icon-only.png");
+              await sharp("public/logo.png").resize(720, 720, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+                .extend({ top: 152, bottom: 152, left: 152, right: 152, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+                .png().toFile("assets/icon-foreground.png");
+              await sharp({ create: { width: 1024, height: 1024, channels: 4, background: "#000000" } })
+                .png().toFile("assets/icon-background.png");
+              const centerBuf = await sharp("public/logo.png").resize(680, 680, { fit: "contain" }).png().toBuffer();
+              await sharp({ create: { width: 2732, height: 2732, channels: 4, background: "#000000" } })
+                .composite([{ input: centerBuf, gravity: "center" }])
+                .png().toFile("assets/splash.png");
+            })();
           '
 
       - name: Generate Android Project & Icons
         run: |
           npx cap add android
-          npx capacitor-assets generate --android --iconBackgroundColor "#141414" --splashBackgroundColor "#141414"
+          npx capacitor-assets generate --android --iconBackgroundColor "#000000" --splashBackgroundColor "#000000"
           node -e '
             const fs = require("fs");
             const path = require("path");
-            const { Resvg } = require("@resvg/resvg-js");
-            const svg = fs.readFileSync("public/icon.svg", "utf8");
-            const fgSvg = svg.replace(/<rect[^>]*fill="#141414"[^>]*\/>/, "");
-            const densities = [
-              ["mipmap-mdpi", 48, 108],
-              ["mipmap-hdpi", 72, 162],
-              ["mipmap-xhdpi", 96, 216],
-              ["mipmap-xxhdpi", 144, 324],
-              ["mipmap-xxxhdpi", 192, 432]
-            ];
-            for (const [dir, iconSize, fgSize] of densities) {
-              const outDir = path.join("android/app/src/main/res", dir);
-              fs.mkdirSync(outDir, { recursive: true });
-              const iconBuf = new Resvg(svg, { fitTo: { mode: "width", value: iconSize } }).render().asPng();
-              const fgBuf = new Resvg(fgSvg, { fitTo: { mode: "width", value: fgSize } }).render().asPng();
-              fs.writeFileSync(path.join(outDir, "ic_launcher.png"), iconBuf);
-              fs.writeFileSync(path.join(outDir, "ic_launcher_round.png"), iconBuf);
-              fs.writeFileSync(path.join(outDir, "ic_launcher_foreground.png"), fgBuf);
-            }
-            const bgXmlPath = "android/app/src/main/res/values/ic_launcher_background.xml";
-            fs.mkdirSync(path.dirname(bgXmlPath), { recursive: true });
-            fs.writeFileSync(bgXmlPath, `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="ic_launcher_background">#141414</color>\n</resources>\n`);
+            const sharp = require("sharp");
+            (async () => {
+              const densities = [
+                ["mipmap-mdpi", 48, 108],
+                ["mipmap-hdpi", 72, 162],
+                ["mipmap-xhdpi", 96, 216],
+                ["mipmap-xxhdpi", 144, 324],
+                ["mipmap-xxxhdpi", 192, 432]
+              ];
+              for (const [dir, iconSize, fgSize] of densities) {
+                const outDir = path.join("android/app/src/main/res", dir);
+                fs.mkdirSync(outDir, { recursive: true });
+                const iconBuf = await sharp("public/logo.png").resize(iconSize, iconSize, { fit: "cover" }).png().toBuffer();
+                const inner = Math.round(fgSize * 0.72);
+                const pad = Math.floor((fgSize - inner) / 2);
+                const fgBuf = await sharp("public/logo.png")
+                  .resize(inner, inner, { fit: "contain", background: "#000000" })
+                  .extend({ top: pad, bottom: fgSize - inner - pad, left: pad, right: fgSize - inner - pad, background: "#000000" })
+                  .png().toBuffer();
+                fs.writeFileSync(path.join(outDir, "ic_launcher.png"), iconBuf);
+                fs.writeFileSync(path.join(outDir, "ic_launcher_round.png"), iconBuf);
+                fs.writeFileSync(path.join(outDir, "ic_launcher_foreground.png"), fgBuf);
+              }
+              const bgXmlPath = "android/app/src/main/res/values/ic_launcher_background.xml";
+              fs.mkdirSync(path.dirname(bgXmlPath), { recursive: true });
+              fs.writeFileSync(bgXmlPath, `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="ic_launcher_background">#000000</color>\n</resources>\n`);
+            })();
           '
           npx cap sync android
 
@@ -114,6 +122,42 @@ jobs:
               xml = xml.replace("</manifest>", `    ${perms}\n</manifest>`);
             }
             fs.writeFileSync(p, xml);
+
+            // Add Android system bar (Navigation Bar + Status Bar) theme bridge
+            const maPath = "android/app/src/main/java/com/blackpage/app/MainActivity.java";
+            if (fs.existsSync(maPath)) {
+              const maCode = `package com.blackpage.app;
+
+import android.graphics.Color;
+import android.os.Bundle;
+import android.webkit.JavascriptInterface;
+import androidx.core.view.WindowInsetsControllerCompat;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    if (this.bridge != null && this.bridge.getWebView() != null) {
+      this.bridge.getWebView().addJavascriptInterface(new Object() {
+        @JavascriptInterface
+        public void setSystemBarsDark(boolean isDark) {
+          runOnUiThread(() -> {
+            int bg = Color.parseColor(isDark ? "#121214" : "#F2EDE2");
+            getWindow().setStatusBarColor(bg);
+            getWindow().setNavigationBarColor(bg);
+            WindowInsetsControllerCompat ctrl = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+            ctrl.setAppearanceLightStatusBars(!isDark);
+            ctrl.setAppearanceLightNavigationBars(!isDark);
+          });
+        }
+      }, "BlackpageNative");
+    }
+  }
+}
+`;
+              fs.writeFileSync(maPath, maCode);
+            }
           '
 
       - name: Build Debug APK

@@ -4,7 +4,7 @@ const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
 const THEME_KEY = "tools_op_theme_v1";
 const PREFS_KEY = "tools_op_prefs_v1";
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const GITHUB_REPO = "Ricardo169zzz/blackpage";
 
 const DEFAULT_PREFS = {
@@ -67,13 +67,29 @@ function getThemeMode() {
 
 function applyTheme(mode = getThemeMode()) {
   const resolved = mode === "auto" ? (systemDarkMq.matches ? "dark" : "light") : mode;
+  const isDark = resolved === "dark";
   document.documentElement.dataset.theme = resolved;
+  document.documentElement.style.colorScheme = resolved;
+  const color = isDark ? "#121214" : "#F2EDE2";
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", resolved === "dark" ? "#121214" : "#F4F1EA");
+  if (meta) meta.setAttribute("content", color);
+  try {
+    window.BlackpageNative?.setSystemBarsDark?.(isDark);
+  } catch {}
+  try {
+    const sb = window.Capacitor?.Plugins?.StatusBar;
+    sb?.setStyle?.({ style: isDark ? "DARK" : "LIGHT" });
+    sb?.setBackgroundColor?.({ color });
+  } catch {}
 }
 
 systemDarkMq.addEventListener("change", () => {
   if (getThemeMode() === "auto") applyTheme("auto");
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && getThemeMode() === "auto") {
+    applyTheme("auto");
+  }
 });
 applyTheme();
 
@@ -101,6 +117,8 @@ import { bratTool } from "./tools/brat.js";
 import { wmp1Tool } from "./tools/wmp1.js";
 import { ttsTool } from "./tools/tts.js";
 import { mountComicReader } from "./tools/comic.js";
+import { nokiaTool } from "./tools/nokia.js";
+import { iqcTool } from "./tools/iqc.js";
 import { renderUniversalBoxHtml, initUniversalBox } from "./tools/universal.js";
 
 const LANG_KEY = "tools_op_lang_v1";
@@ -168,6 +186,8 @@ const PINTEREST_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="cur
 const BRAT_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 10h10M7 14h6"/></svg>`;
 const WMP1_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 8h10M7 12h8M7 16h6"/></svg>`;
 const TTS_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+const NOKIA_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><rect x="8" y="5" width="8" height="6"/><path d="M9 15h.01M12 15h.01M15 15h.01M9 18h.01M12 18h.01M15 18h.01"/></svg>`;
+const IQC_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>`;
 const AIO_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
 
 const SUPPORT_DOWNLOADERS = [
@@ -193,6 +213,20 @@ const TOOLS = [
     ...wmp1Tool,
     shortName: "WMP Quote",
     icon: WMP1_SVG,
+    category: "Sticker",
+    color: "card-yellow",
+  },
+  {
+    ...nokiaTool,
+    shortName: "Nokia SMS",
+    icon: NOKIA_SVG,
+    category: "Sticker",
+    color: "card-yellow",
+  },
+  {
+    ...iqcTool,
+    shortName: "IQC Quote",
+    icon: IQC_SVG,
     category: "Sticker",
     color: "card-yellow",
   },
@@ -901,7 +935,7 @@ function renderTentangSettings() {
   return `
     <div class="about-card">
       <div class="about-head">
-        <img src="./icon.svg" alt="Blackpage Logo" class="about-logo" />
+        <img src="./logo.png" alt="Blackpage Logo" class="about-logo" />
         <div>
           <h3 style="margin:0;">BLACKPAGE</h3>
           <p class="stage-desc" style="margin:2px 0 0;">v${APP_VERSION} · Manga Editorial · APK-Ready</p>
@@ -1309,3 +1343,15 @@ async function checkHealth() {
 history.replaceState({ page: "home" }, "");
 renderHome(true);
 checkHealth();
+
+const bpIntroEl = document.getElementById("bpIntro");
+if (bpIntroEl) {
+  const reduce = getPrefs().reduceMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(
+    () => {
+      bpIntroEl.classList.add("is-exit");
+      setTimeout(() => bpIntroEl.remove(), 700);
+    },
+    reduce ? 50 : 1400
+  );
+}

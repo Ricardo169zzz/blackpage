@@ -1,4 +1,4 @@
-import { makeProxyUrl, downloadMediaFile } from "./download.js";
+import { makeProxyUrl, downloadMediaFile, openStickerLightbox } from "./download.js";
 
 export const wmp1Tool = {
   id: "wmp1-quote",
@@ -122,6 +122,11 @@ export const wmp1Tool = {
     });
 
     resultEl.addEventListener("click", async (e) => {
+      const clickedImg = e.target.closest("#wmpImg");
+      if (clickedImg && !resultEl.querySelector("#wmpWrap")?.classList.contains("is-loading")) {
+        openStickerLightbox(clickedImg.src, "WMP QUOTE");
+        return;
+      }
       if (e.target.closest("#wmpRetryBtn") && currentText) {
         generate(currentText, 1);
         return;

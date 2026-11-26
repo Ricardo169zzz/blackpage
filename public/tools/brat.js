@@ -1,4 +1,4 @@
-import { makeProxyUrl, downloadMediaFile } from "./download.js";
+import { makeProxyUrl, downloadMediaFile, openStickerLightbox } from "./download.js";
 
 export const bratTool = {
   id: "brat-sticker",
@@ -116,6 +116,11 @@ export const bratTool = {
     });
 
     resultEl.addEventListener("click", async (e) => {
+      const clickedImg = e.target.closest("#bratImg");
+      if (clickedImg && !resultEl.querySelector("#bratWrap")?.classList.contains("is-loading")) {
+        openStickerLightbox(clickedImg.src, "BRAT STICKER");
+        return;
+      }
       if (e.target.closest("#bratRetryBtn") && currentText) {
         generate(currentText, 1);
         return;

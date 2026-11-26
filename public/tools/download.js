@@ -1,4 +1,4 @@
-export function makeProxyUrl(API_BASE, remoteUrl, { download = false, filename = "" } = {}) {
+export function makeProxyUrl(API_BASE, remoteUrl, { download = false, filename = "", referer = "", fallback = false } = {}) {
   if (remoteUrl.startsWith(`${API_BASE}/api/`) || remoteUrl.startsWith("/api/")) {
     const u = new URL(remoteUrl, window.location.origin);
     if (download) u.searchParams.set("download", "1");
@@ -8,6 +8,8 @@ export function makeProxyUrl(API_BASE, remoteUrl, { download = false, filename =
   const params = new URLSearchParams({ url: remoteUrl });
   if (download) params.set("download", "1");
   if (filename) params.set("filename", filename);
+  if (referer) params.set("ref", referer);
+  if (fallback) params.set("fallback", "1");
   return `${API_BASE}/api/media?${params.toString()}`;
 }
 
@@ -270,6 +272,32 @@ function endGlobalToast(ok, errorMsg = "") {
     renderToast();
     toastState.hideTimer = setTimeout(hideToastNow, 4500);
   }
+}
+
+export function openStickerLightbox(imgSrc, title = "Preview Sticker") {
+  if (!imgSrc) return;
+  document.querySelector("#bpStickerLightbox")?.remove();
+  const host = document.querySelector(".app-shell") || document.body;
+  const modal = document.createElement("div");
+  modal.id = "bpStickerLightbox";
+  modal.className = "sticker-lightbox-backdrop";
+  modal.innerHTML = `
+    <div class="sticker-lightbox-frame" role="dialog" aria-modal="true">
+      <div class="sticker-lightbox-head">
+        <span class="tag">${escapeAttr(title)}</span>
+        <button type="button" class="btn btn-sm" id="stickerLbClose">&times; Tutup</button>
+      </div>
+      <div class="sticker-lightbox-mat">
+        <img class="sticker-lightbox-img" src="${escapeAttr(imgSrc)}" alt="${escapeAttr(title)}" />
+      </div>
+    </div>
+  `;
+  const close = () => modal.remove();
+  modal.querySelector("#stickerLbClose")?.addEventListener("click", close);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) close();
+  });
+  host.appendChild(modal);
 }
 
 function triggerBrowserDownload(href, filename) {
