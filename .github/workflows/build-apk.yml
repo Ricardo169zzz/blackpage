@@ -126,36 +126,38 @@ jobs:
             // Add Android system bar (Navigation Bar + Status Bar) theme bridge
             const maPath = "android/app/src/main/java/com/blackpage/app/MainActivity.java";
             if (fs.existsSync(maPath)) {
-              const maCode = `package com.blackpage.app;
-
-import android.graphics.Color;
-import android.os.Bundle;
-import android.webkit.JavascriptInterface;
-import androidx.core.view.WindowInsetsControllerCompat;
-import com.getcapacitor.BridgeActivity;
-
-public class MainActivity extends BridgeActivity {
-  @Override
-  protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-    if (this.bridge != null && this.bridge.getWebView() != null) {
-      this.bridge.getWebView().addJavascriptInterface(new Object() {
-        @JavascriptInterface
-        public void setSystemBarsDark(boolean isDark) {
-          runOnUiThread(() -> {
-            int bg = Color.parseColor(isDark ? "#121214" : "#F2EDE2");
-            getWindow().setStatusBarColor(bg);
-            getWindow().setNavigationBarColor(bg);
-            WindowInsetsControllerCompat ctrl = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
-            ctrl.setAppearanceLightStatusBars(!isDark);
-            ctrl.setAppearanceLightNavigationBars(!isDark);
-          });
-        }
-      }, "BlackpageNative");
-    }
-  }
-}
-`;
+              const maCode = [
+                "package com.blackpage.app;",
+                "",
+                "import android.graphics.Color;",
+                "import android.os.Bundle;",
+                "import android.webkit.JavascriptInterface;",
+                "import androidx.core.view.WindowInsetsControllerCompat;",
+                "import com.getcapacitor.BridgeActivity;",
+                "",
+                "public class MainActivity extends BridgeActivity {",
+                "  @Override",
+                "  protected void onCreate(Bundle savedInstanceState) {",
+                "    super.onCreate(savedInstanceState);",
+                "    if (this.bridge != null && this.bridge.getWebView() != null) {",
+                "      this.bridge.getWebView().addJavascriptInterface(new Object() {",
+                "        @JavascriptInterface",
+                "        public void setSystemBarsDark(boolean isDark) {",
+                "          runOnUiThread(() -> {",
+                "            int bg = Color.parseColor(isDark ? \"#121214\" : \"#F2EDE2\");",
+                "            getWindow().setStatusBarColor(bg);",
+                "            getWindow().setNavigationBarColor(bg);",
+                "            WindowInsetsControllerCompat ctrl = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());",
+                "            ctrl.setAppearanceLightStatusBars(!isDark);",
+                "            ctrl.setAppearanceLightNavigationBars(!isDark);",
+                "          });",
+                "        }",
+                "      }, \"BlackpageNative\");",
+                "    }",
+                "  }",
+                "}",
+                ""
+              ].join("\n");
               fs.writeFileSync(maPath, maCode);
             }
           '
