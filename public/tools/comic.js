@@ -698,7 +698,18 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
         startScrollLoop();
       }
 
+      let mo = null;
+      if (typeof MutationObserver !== "undefined") {
+        mo = new MutationObserver(() => {
+          if (!stageEl.querySelector("#comicReaderPages")) {
+            cleanupReaderWidgets();
+          }
+        });
+        mo.observe(stageEl, { childList: true });
+      }
+
       readerCleanup = () => {
+        mo?.disconnect();
         stopScrollLoop();
         io?.disconnect();
         workspace?.removeEventListener("scroll", onScrollCheck);

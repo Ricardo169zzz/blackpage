@@ -1238,10 +1238,12 @@ function mountTool(id, prefillUrl = "", fromPopstate = false) {
 }
 
 function navigate(page, fromPopstate = false) {
+  document.querySelectorAll(".comic-float-back, .comic-as-float").forEach((n) => n.remove());
   if (page === "home") renderHome(fromPopstate);
   else if (page === "tools") renderToolsPage(fromPopstate);
   else if (page === "gallery") renderGallery(fromPopstate);
   else if (page === "settings") renderSettings(fromPopstate);
+  else if (page === "comic") mountComicPage(fromPopstate);
   else if (page.startsWith("tool:")) mountTool(page.slice(5), "", fromPopstate);
   else if (page.startsWith("gallery:")) renderGalleryDetail(Number(page.slice(8)), fromPopstate);
   else if (page.startsWith("settings:")) renderSettingDetail(page.slice(9), fromPopstate);
