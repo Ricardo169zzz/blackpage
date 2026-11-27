@@ -40,12 +40,33 @@ function escapeHtml(str) {
 }
 
 function normalizeQuery(s) {
-  return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/(.)\1+/g, "$1");
+}
+
+function matchesSurah(num, name, meaning, rawQ) {
+  const nq = normalizeQuery(rawQ);
+  if (!nq) return true;
+  if (String(num) === nq) return true;
+  const nName = normalizeQuery(name);
+  const nMeaning = normalizeQuery(meaning);
+  if (nName.includes(nq) || nMeaning.includes(nq)) return true;
+  // Tolerate Indonesian suffixes/variants like "alkahfi" vs "alkahf"
+  if (nq.length >= 4 && nq.startsWith(nName) && nq.length <= nName.length + 2) return true;
+  const noPrefixQ = nq.replace(/^(al|an|ar|as|at|az|ash|asy)/, "");
+  const noPrefixN = nName.replace(/^(al|an|ar|as|at|az|ash|asy)/, "");
+  if (noPrefixQ.length >= 3 && (noPrefixN.includes(noPrefixQ) || (noPrefixQ.startsWith(noPrefixN) && noPrefixQ.length <= noPrefixN.length + 2))) {
+    return true;
+  }
+  return false;
 }
 
 export const quranTool = {
   id: "islami-quran",
   name: "Al-Qur'an Digital",
+  badge: "ISLAMI",
   desc: "Cari surah atau baca ayat lengkap dengan arab, latin, dan terjemahan Indonesia.",
   render() {
     return `
@@ -59,22 +80,18 @@ export const quranTool = {
       </div>
     `;
   },
-  mount(root, { API_BASE }) {
+  init(root, { API_BASE }) {
     const searchInput = root.querySelector("#quranSearchInput");
     const ayatInput = root.querySelector("#quranAyatInput");
     const statusEl = root.querySelector("#quranStatus");
     const contentEl = root.querySelector("#quranContent");
+    const PAGE_SIZE = 10;
+    let surahPage = 1;
 
     function renderSurahList(q = "") {
-      const nq = normalizeQuery(q);
-      const list = !nq
+      const list = !String(q || "").trim()
         ? SURAHS
-        : SURAHS.filter(
-            ([num, name, meaning]) =>
-              String(num) === nq ||
-              normalizeQuery(name).includes(nq) ||
-              normalizeQuery(meaning).includes(nq)
-          );
+        : SURAHS.filter(([num, name, meaning]) => matchesSurah(num, name, meaning, q));
 
       statusEl.innerHTML = "";
       if (!list.length) {
@@ -82,9 +99,15 @@ export const quranTool = {
         return;
       }
 
+      const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+      if (surahPage > totalPages) surahPage = totalPages;
+      if (surahPage < 1) surahPage = 1;
+      const start = (surahPage - 1) * PAGE_SIZE;
+      const pageItems = list.slice(start, start + PAGE_SIZE);
+
       contentEl.innerHTML = `
         <div class="bp-quran-list">
-          ${list
+          ${pageItems
             .map(
               ([num, name, meaning, count]) => `
               <button type="button" class="bp-quran-surah-row" data-surah-num="${num}">
@@ -99,6 +122,13 @@ export const quranTool = {
             )
             .join("")}
         </div>
+        ${totalPages > 1
+          ? `<div class="bp-quran-pager">
+              <button type="button" class="btn btn-sm bp-quran-page-btn" id="quranPrevPage" ${surahPage <= 1 ? "disabled" : ""} aria-label="Halaman sebelumnya">&lt;</button>
+              <span class="tag">${surahPage} / ${totalPages}</span>
+              <button type="button" class="btn btn-sm bp-quran-page-btn" id="quranNextPage" ${surahPage >= totalPages ? "disabled" : ""} aria-label="Halaman berikutnya">&gt;</button>
+            </div>`
+          : ""}
       `;
     }
 
@@ -173,10 +203,23 @@ export const quranTool = {
     }
 
     searchInput.addEventListener("input", () => {
+      surahPage = 1;
       renderSurahList(searchInput.value);
     });
 
     contentEl.addEventListener("click", (e) => {
+      if (e.target.closest("#quranPrevPage")) {
+        if (surahPage > 1) {
+          surahPage--;
+          renderSurahList(searchInput.value);
+        }
+        return;
+      }
+      if (e.target.closest("#quranNextPage")) {
+        surahPage++;
+        renderSurahList(searchInput.value);
+        return;
+      }
       const btn = e.target.closest("[data-surah-num]");
       if (!btn) return;
       loadSurah(Number(btn.dataset.surahNum), ayatInput.value.trim());

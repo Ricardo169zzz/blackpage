@@ -25,6 +25,10 @@ function fmtTime(sec) {
 const SPOTIFY_SVG = `<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1DB954" stroke="#141414" stroke-width="1.8"/><path d="M7.2 9.7c3.3-1 6.9-.8 9.8.7M7.8 12.6c2.7-.8 5.7-.6 8.1.6M8.5 15.3c2.1-.6 4.4-.4 6.2.5" fill="none" stroke="#141414" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 const SEARCH_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.5" y2="16.5"/></svg>`;
 const PLAY_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"/></svg>`;
+const PAUSE_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4.5" height="16" rx="1"/><rect x="13.5" y="4" width="4.5" height="16" rx="1"/></svg>`;
+const PREV_ICON_SVG = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="4" y="5" width="2.5" height="14"/><polygon points="20,5 9,12 20,19"/></svg>`;
+const NEXT_ICON_SVG = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="4,5 15,12 4,19"/><rect x="17.5" y="5" width="2.5" height="14"/></svg>`;
+const CLOSE_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 const DL_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><polyline points="7 11 12 16 17 11"/><path d="M5 20h14"/></svg>`;
 const CIRCLE_EQ_SVG = `<svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><rect x="1" y="5" width="2" height="6" rx="1"/><rect x="5" y="2" width="2" height="9" rx="1"/><rect x="9" y="4" width="2" height="7" rx="1"/></svg>`;
 const CIRCLE_PAUSE_SVG = `<svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><rect x="2.5" y="2" width="2.5" height="8" rx="0.8"/><rect x="7" y="2" width="2.5" height="8" rx="0.8"/></svg>`;
@@ -199,11 +203,25 @@ export function createMusicPlayer({
   }
 
   function refreshTracks() {
+    const prevTrack = getCurrentTrack();
     const all = loadGalleryItems();
     state.tracks = all
       .map((item, galleryIdx) => ({ ...item, galleryIdx }))
-      .filter((item) => item.mediaType === "audio");
-    if (state.currentIdx >= state.tracks.length) {
+      .filter((item) => item.mediaType === "audio")
+      .sort((a, b) => (b.downloadedAt || 0) - (a.downloadedAt || 0));
+
+    if (prevTrack) {
+      const keptIdx = state.tracks.findIndex(
+        (t) =>
+          (prevTrack.mediaUrl && t.mediaUrl === prevTrack.mediaUrl) ||
+          (prevTrack.url && t.url === prevTrack.url && t.title === prevTrack.title)
+      );
+      if (keptIdx >= 0) {
+        state.currentIdx = keptIdx;
+      } else if (state.currentIdx >= state.tracks.length) {
+        state.currentIdx = state.tracks.length - 1;
+      }
+    } else if (state.currentIdx >= state.tracks.length) {
       state.currentIdx = state.tracks.length - 1;
     }
     return state.tracks;
@@ -495,9 +513,9 @@ export function createMusicPlayer({
 
           <div class="bp-spotify-controls">
             <button type="button" class="bp-sp-icon-btn ${snap.shuffle ? "is-on" : ""}" id="musicShuffleBtn" title="${en ? "Shuffle" : "Acak"}" aria-label="${en ? "Shuffle" : "Acak"}">⇄</button>
-            <button type="button" class="bp-sp-icon-btn" id="musicPrevBtn" title="${en ? "Previous" : "Sebelumnya"}" aria-label="${en ? "Previous" : "Sebelumnya"}">⏮</button>
-            <button type="button" class="bp-sp-play-btn" id="musicPlayBtn" aria-label="${snap.isPlaying ? (en ? "Pause" : "Jeda") : (en ? "Play" : "Putar")}">${snap.isPlaying ? "⏸" : "▶"}</button>
-            <button type="button" class="bp-sp-icon-btn" id="musicNextBtn" title="${en ? "Next" : "Berikutnya"}" aria-label="${en ? "Next" : "Berikutnya"}">⏭</button>
+            <button type="button" class="bp-sp-icon-btn" id="musicPrevBtn" title="${en ? "Previous" : "Sebelumnya"}" aria-label="${en ? "Previous" : "Sebelumnya"}">${PREV_ICON_SVG}</button>
+            <button type="button" class="bp-sp-play-btn" id="musicPlayBtn" aria-label="${snap.isPlaying ? (en ? "Pause" : "Jeda") : (en ? "Play" : "Putar")}">${snap.isPlaying ? PAUSE_ICON_SVG : PLAY_ICON_SVG}</button>
+            <button type="button" class="bp-sp-icon-btn" id="musicNextBtn" title="${en ? "Next" : "Berikutnya"}" aria-label="${en ? "Next" : "Berikutnya"}">${NEXT_ICON_SVG}</button>
             <button type="button" class="bp-sp-icon-btn ${snap.repeat !== "off" ? "is-on" : ""}" id="musicRepeatBtn" title="${en ? "Repeat" : "Ulangi"}" aria-label="${en ? "Repeat" : "Ulangi"}">${snap.repeat === "one" ? "1↻" : "↻"}</button>
           </div>
         </div>
@@ -816,9 +834,9 @@ export function createMusicPlayer({
           </div>
         </button>
         <div class="bp-mini-actions">
-          <button type="button" class="btn btn-sm btn-primary" id="miniPlayBtn">${snap.isPlaying ? "⏸" : "▶"}</button>
-          <button type="button" class="btn btn-sm" id="miniNextBtn">⏭</button>
-          <button type="button" class="btn btn-sm" id="miniCloseBtn" title="Tutup">✕</button>
+          <button type="button" class="btn btn-sm btn-primary bp-mini-svg-btn" id="miniPlayBtn" aria-label="Play/Pause">${snap.isPlaying ? PAUSE_ICON_SVG : PLAY_ICON_SVG}</button>
+          <button type="button" class="btn btn-sm bp-mini-svg-btn" id="miniNextBtn" aria-label="Next">${NEXT_ICON_SVG}</button>
+          <button type="button" class="btn btn-sm bp-mini-svg-btn" id="miniCloseBtn" title="Tutup" aria-label="Close">${CLOSE_ICON_SVG}</button>
         </div>
       </div>
       <div class="bp-mini-circle-view" aria-label="Musik sedang diputar">

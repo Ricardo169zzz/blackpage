@@ -2265,20 +2265,7 @@ body::before {
   width: calc(100% - 24px);
   height: 62px;
   z-index: 60;
-  cursor: pointer;
-  overflow: hidden;
-  background: var(--surface);
-  border: var(--border);
-  box-shadow: var(--shadow-ink);
-  transform-origin: left bottom;
-  animation: dlToastEnter 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
-  transition:
-    width 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    height 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.24s ease,
-    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.24s ease;
+  pointer-events: none;
 }
 
 @keyframes dlToastEnter {
@@ -2286,16 +2273,16 @@ body::before {
     opacity: 0;
     transform: translate3d(0, 12px, 0) scale(0.96);
   }
-
   to {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
-.dl-toast.is-hiding {
+.dl-toast.is-hiding .dl-toast-rect,
+.dl-toast.is-hiding .dl-circle-badge {
   opacity: 0;
-  transform: translate3d(0, 10px, 0) scale(0.95);
+  transform: translate3d(0, 10px, 0) scale(0.92);
   pointer-events: none;
 }
 
@@ -2304,11 +2291,17 @@ body::before {
 }
 
 .dl-toast-rect {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   padding: 9px 12px;
-  transition: opacity 0.2s var(--ease);
+  background: var(--surface);
+  border: var(--border);
+  box-shadow: var(--shadow-ink);
+  pointer-events: auto;
+  cursor: pointer;
+  transform-origin: left bottom;
+  animation: dlToastEnter 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: opacity 0.22s var(--ease), transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .dl-toast-row {
@@ -2383,30 +2376,28 @@ body::before {
   height: 7px;
 }
 
-.dl-toast.is-circle {
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  border-width: 2px;
-  box-shadow: 0 4px 14px rgba(20, 20, 22, 0.26);
-  overflow: visible;
-}
-
 .dl-toast.is-circle .dl-toast-rect {
   opacity: 0;
+  transform: scale(0.32);
   pointer-events: none;
 }
 
 .dl-circle-badge {
   position: absolute;
-  inset: 0;
+  left: 0;
+  bottom: 0;
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
+  border: 2px solid var(--ink);
+  box-shadow: 0 4px 14px rgba(20, 20, 22, 0.26);
   background: var(--ink);
   color: var(--surface);
   display: grid;
   place-items: center;
+  cursor: pointer;
   opacity: 0;
-  transform: scale(0.72);
+  transform: scale(0.65);
   pointer-events: none;
   transition: opacity 0.22s var(--ease), transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
 }
@@ -3736,32 +3727,16 @@ body::before {
   padding: 4px 8px;
 }
 
-/* Top Floating Banner -> Morphs to Draggable Circle after 3s */
+/* Top Floating Banner -> GPU-only Morph to Draggable Circle after 3s */
 .bp-mini-player {
   position: absolute;
-  top: 62px;
-  left: 12px;
-  width: calc(100% - 24px);
-  height: 50px;
-  background: var(--surface);
-  border: 2px solid var(--ink);
-  box-shadow: 3px 3px 0 var(--ink);
-  overflow: hidden;
+  top: 64px;
+  left: calc(100% - 54px);
+  width: 42px;
+  height: 42px;
   z-index: 45;
-  transform-origin: right center;
-  transition:
-    width 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    height 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    left 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    top 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.35s ease,
-    transform 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.24s var(--ease);
-}
-
-.bp-mini-player.from-left {
-  transform-origin: left center;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
 }
 
 .bp-mini-player[hidden] {
@@ -3769,38 +3744,51 @@ body::before {
 }
 
 .bp-mini-banner-view {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 5px 8px;
-  transition: opacity 0.18s var(--ease);
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  overflow: hidden;
+  pointer-events: auto;
+  transform-origin: right center;
+  transition: opacity 0.22s var(--ease), transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.bp-mini-player.from-left .bp-mini-banner-view {
+  transform-origin: left center;
 }
 
 .bp-mini-circle-view {
   position: absolute;
   inset: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  box-shadow: 0 4px 14px rgba(20, 20, 22, 0.26);
   opacity: 0;
   pointer-events: none;
   display: grid;
   place-items: center;
   padding: 2px;
   background: var(--surface);
+  transform: scale(0.65);
   transition: opacity 0.22s var(--ease), transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-  transform: scale(0.85);
 }
 
 .bp-mini-player.is-circle {
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
-  box-shadow: 0 4px 14px rgba(20, 20, 22, 0.26);
   touch-action: none;
   cursor: grab;
-  overflow: visible;
+  pointer-events: auto;
 }
 
 .bp-mini-player.is-circle.is-idle {
@@ -3816,14 +3804,22 @@ body::before {
 
 .bp-mini-player.is-circle .bp-mini-banner-view {
   opacity: 0;
+  transform: scaleX(0.32) scaleY(0.8);
   pointer-events: none;
 }
 
 .bp-mini-player.is-circle .bp-mini-circle-view {
   opacity: 1;
   pointer-events: auto;
-  border-radius: 999px;
   transform: scale(1);
+}
+
+.bp-mini-svg-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
 }
 
 .bp-mini-circle-img {
@@ -5025,4 +5021,17 @@ body::before {
   margin: 0;
   font-size: 0.8rem;
   line-height: 1.5;
+}
+
+.bp-quran-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.bp-quran-page-btn {
+  min-width: 40px;
+  font-weight: 800;
 }

@@ -7,7 +7,7 @@ const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
 const THEME_KEY = "tools_op_theme_v1";
 const PREFS_KEY = "tools_op_prefs_v1";
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.5.1";
 const GITHUB_REPO = "Ricardo169zzz/blackpage";
 
 const DEFAULT_PREFS = {
@@ -359,16 +359,14 @@ function collapseToCircle() {
   if (!miniPlayerEl || miniPlayerEl.hidden) return;
   if (!miniCirclePos) miniCirclePos = getDefaultCirclePos();
   const { w, h } = getShellSize();
-  const x = Math.max(8, Math.min(w - 48, miniCirclePos.x));
+  const x = Math.max(8, Math.min(w - 50, miniCirclePos.x));
   const y = Math.max(58, Math.min(h - 60, miniCirclePos.y));
   miniCirclePos = { x, y };
-  const isLeft = x + 20 < w / 2;
+  const isLeft = x + 21 < w / 2;
   miniPlayerEl.classList.toggle("from-left", isLeft);
   miniPlayerEl.classList.add("is-circle");
   miniPlayerEl.style.left = `${x}px`;
   miniPlayerEl.style.top = `${y}px`;
-  miniPlayerEl.style.width = "40px";
-  miniPlayerEl.style.height = "40px";
   scheduleMiniIdleFade();
 }
 
@@ -384,18 +382,22 @@ function expandMiniBanner() {
   if (!miniCirclePos) miniCirclePos = getDefaultCirclePos();
   const { w, h } = getShellSize();
   const bannerW = Math.min(336, Math.max(240, w - 24));
-  const isLeft = miniCirclePos.x + 20 < w / 2;
+  const isLeft = miniCirclePos.x + 21 < w / 2;
   const bannerLeft = isLeft
     ? Math.max(12, Math.min(miniCirclePos.x, w - bannerW - 12))
-    : Math.max(12, Math.min(miniCirclePos.x + 40 - bannerW, w - bannerW - 12));
-  const bannerTop = Math.max(58, Math.min(miniCirclePos.y - 5, h - 66));
+    : Math.max(12, Math.min(miniCirclePos.x + 42 - bannerW, w - bannerW - 12));
+  const bannerTop = Math.max(58, Math.min(miniCirclePos.y - 4, h - 66));
 
   miniPlayerEl.classList.toggle("from-left", isLeft);
   miniPlayerEl.classList.remove("is-circle", "is-idle");
-  miniPlayerEl.style.left = `${bannerLeft}px`;
-  miniPlayerEl.style.top = `${bannerTop}px`;
-  miniPlayerEl.style.width = `${bannerW}px`;
-  miniPlayerEl.style.height = "50px";
+  miniPlayerEl.style.left = `${miniCirclePos.x}px`;
+  miniPlayerEl.style.top = `${miniCirclePos.y}px`;
+  const bannerEl = miniPlayerEl.querySelector(".bp-mini-banner-view");
+  if (bannerEl) {
+    bannerEl.style.width = `${bannerW}px`;
+    bannerEl.style.left = `${bannerLeft - miniCirclePos.x}px`;
+    bannerEl.style.top = `${bannerTop - miniCirclePos.y}px`;
+  }
   scheduleMiniCollapse();
 }
 
@@ -435,11 +437,14 @@ function saveMusicTrack(entry) {
 function markTrackDownloaded(idx, filename, thumbFilename) {
   const list = loadGalleryItems();
   if (!list[idx]) return false;
-  list[idx].filename = filename || list[idx].filename;
-  if (thumbFilename) list[idx].thumbFilename = thumbFilename;
-  list[idx].offlineSaved = true;
+  const item = list[idx];
+  item.filename = filename || item.filename;
+  if (thumbFilename) item.thumbFilename = thumbFilename;
+  item.offlineSaved = true;
+  item.downloadedAt = Date.now();
+  const reordered = [item, ...list.filter((_, i) => i !== idx)];
   try {
-    localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(list));
+    localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(reordered));
     return true;
   } catch {
     return false;
@@ -500,7 +505,11 @@ const musicPlayer = createMusicPlayer({
         const circleImg = miniPlayerEl.querySelector(".bp-mini-circle-img");
         const circleDot = miniPlayerEl.querySelector(".bp-mini-circle-dot");
         if (bar) bar.style.transform = `scaleX(${(pct / 100).toFixed(3)})`;
-        if (playBtn) playBtn.textContent = snap.isPlaying ? "⏸" : "▶";
+        if (playBtn) {
+          playBtn.innerHTML = snap.isPlaying
+            ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4.5" height="16" rx="1"/><rect x="13.5" y="4" width="4.5" height="16" rx="1"/></svg>`
+            : `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"/></svg>`;
+        }
         if (titleEl && titleEl.textContent !== miniTitleText) titleEl.textContent = miniTitleText;
         if (circleImg) circleImg.classList.toggle("is-spinning", Boolean(snap.isPlaying));
         if (circleDot) {
@@ -1200,9 +1209,10 @@ function renderGalleryDetail(idx, fromPopstate = false) {
 
   const hasCaption = Boolean(item.title && item.title.trim());
 
+  const isEn = getLang() === "en";
   stageEl.innerHTML = `
     <div class="tool-topbar">
-      <button type="button" class="btn btn-sm" data-page="gallery">← Kembali ke Galeri</button>
+      <button type="button" class="btn btn-sm" data-page="${isAudio ? "music" : "gallery"}">${isAudio ? (isEn ? "← Back to Music" : "← Kembali ke Music") : (isEn ? "← Back to Gallery" : "← Kembali ke Galeri")}</button>
       <div style="display:flex;gap:6px;align-items:center;">
         <span class="tag" id="galOfflineTag" hidden>OFFLINE</span>
         <span class="tag">${isAudio ? "MP3" : isImage ? "FOTO" : "VIDEO"}</span>
@@ -1237,7 +1247,7 @@ function renderGalleryDetail(idx, fromPopstate = false) {
 
         <div class="dl-list">
           <button type="button" class="btn btn-success" id="galDownloadBtn">Unduh Lagi</button>
-          <button type="button" class="btn" id="galDeleteBtn">Hapus dari Galeri</button>
+          <button type="button" class="btn" id="galDeleteBtn">${isAudio ? (isEn ? "Delete from Music" : "Hapus dari Music") : (isEn ? "Delete from Gallery" : "Hapus dari Galeri")}</button>
         </div>
       </div>
     </article>
@@ -1345,7 +1355,9 @@ function renderGalleryDetail(idx, fromPopstate = false) {
   delBtn.addEventListener("click", () => {
     const updated = loadGalleryItems().filter((_, i) => i !== idx);
     localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(updated));
-    renderGallery();
+    musicPlayer.refreshTracks();
+    if (isAudio) renderMusicPage();
+    else renderGallery();
   });
 }
 

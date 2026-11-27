@@ -2,6 +2,17 @@
 
 Semua perubahan penting pada proyek **Blackpage** dicatat di file ini.
 
+## [1.5.1] — 2026-11-28
+
+### Perbaikan & Peningkatan
+- **Music Player & Banner**:
+  - Memperbaiki indeks lagu agar banner/notifikasi tidak ketukar saat mengunduh lagu baru sambil memutar lagu lain, serta mengurutkan lagu terbaru di posisi paling atas (`#1`).
+  - Mengganti seluruh ikon kontrol Play/Pause/Next/Close di Mini-Banner & Hero Player menjadi SVG (tanpa emoji).
+  - Mengubah animasi morphing Banner ↔ Lingkaran (Music & Download Toast) menjadi GPU-only (`transform` + `opacity`) agar 60fps bebas lag.
+  - Tombol kembali & hapus di detail `•••` lagu Music sekarang mengarah kembali ke tab `Music` (`← Kembali ke Music`).
+- **Al-Qur'an Digital (`Islami`)**:
+  - Memperbaiki `badge` & `init()` agar tool langsung tampil dan berfungsi, menambah fallback `equran.id` lengkap 114 surah, membatasi daftar surah 10 per halaman (`<` / `>`), dan mendukung pencarian ejaan Indonesia (seperti `alkahfi`, `kahfi`, `yasiin`).
+
 ## [1.5.0] — 2026-11-28
 
 ### Fitur Baru
