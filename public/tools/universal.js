@@ -1,4 +1,4 @@
-import { makeProxyUrl, downloadMediaFile } from "./download.js";
+import { makeProxyUrl, downloadMediaFile, cacheOfflineThumb } from "./download.js";
 
 const GALLERY_KEY = "tools_op_tiktok_history_v1";
 const MAX_GALLERY = 30;
@@ -22,6 +22,7 @@ function saveToGallery(entry) {
     mediaUrl: entry.mediaUrl,
     mediaType: entry.mediaType || "video",
     filename: entry.filename,
+    thumbFilename: entry.thumbFilename || "",
     downloadedAt: Date.now(),
   });
   localStorage.setItem(GALLERY_KEY, JSON.stringify(list.slice(0, MAX_GALLERY)));
@@ -68,14 +69,17 @@ export function renderUniversalBoxHtml(lang = "id") {
       </div>
 
       <form id="uniForm" class="input-row">
-        <input
-          id="uniInput"
-          class="brutal-input"
-          type="url"
-          placeholder="${isEn ? "Paste video, audio, or image link here..." : "Tempel link video, musik, atau foto di sini..."}"
-          autocomplete="off"
-          required
-        />
+        <div class="uni-input-wrap">
+          <input
+            id="uniInput"
+            class="brutal-input"
+            type="url"
+            placeholder="${isEn ? "Paste video, audio, or image link here..." : "Tempel link video, musik, atau foto di sini..."}"
+            autocomplete="off"
+            required
+          />
+          <button type="button" id="uniClear" class="uni-clear-btn" aria-label="${isEn ? "Clear link" : "Hapus link"}" hidden>&times;</button>
+        </div>
         <button type="button" id="uniPaste" class="btn btn-cyan">${isEn ? "Paste" : "Tempel"}</button>
         <button type="submit" id="uniSubmit" class="btn btn-primary">${isEn ? "Process" : "Proses"}</button>
       </form>
@@ -89,6 +93,7 @@ export function renderUniversalBoxHtml(lang = "id") {
 export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPaste: false, autoAnalyze: true, autoSaveGallery: true } }) {
   const form = root.querySelector("#uniForm");
   const input = root.querySelector("#uniInput");
+  const clearBtn = root.querySelector("#uniClear");
   const pasteBtn = root.querySelector("#uniPaste");
   const submitBtn = root.querySelector("#uniSubmit");
   const detectTag = root.querySelector("#uniDetectTag");
@@ -97,8 +102,54 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
 
   let activeDownloadFn = null;
   let activeCopyText = "";
+  let procTimers = [];
+  let procExitTimer = null;
+
+  const CHECK_SVG = `<svg class="bp-check-svg" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>`;
+  const BUG_SVG = `<svg class="bp-bug-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="6" width="8" height="14" rx="4"/><path d="M19 10h2M3 10h2M19 15h2M3 15h2M17 7l2-2M7 7L5 5M17 19l2 2M7 19l-2 2M12 6V3"/></svg>`;
+
+  function clearProcTimers() {
+    procTimers.forEach((id) => clearTimeout(id));
+    procTimers = [];
+    clearTimeout(procExitTimer);
+  }
+
+  function renderProcCard(pct, label, state = "loading") {
+    const iconHtml =
+      state === "success"
+        ? CHECK_SVG
+        : state === "error"
+          ? BUG_SVG
+          : `<span class="bp-proc-spin"></span>`;
+    const stateCls = state === "success" ? "is-success" : state === "error" ? "is-error" : "";
+    let card = feedback.querySelector(".bp-proc-card");
+    if (!card) {
+      feedback.innerHTML = `
+        <div class="bp-proc-card ${stateCls}">
+          <div class="bp-proc-head">
+            <div class="bp-proc-status">
+              <span class="bp-proc-icon">${iconHtml}</span>
+              <span class="bp-proc-label">${escapeHtml(label)}</span>
+            </div>
+            <span class="bp-proc-pct">${pct}%</span>
+          </div>
+          <div class="bp-proc-track">
+            <div class="bp-proc-fill" style="transform:scaleX(${(pct / 100).toFixed(3)})"></div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+    card.classList.remove("is-success", "is-error", "is-exit");
+    if (stateCls) card.classList.add(stateCls);
+    card.querySelector(".bp-proc-icon").innerHTML = iconHtml;
+    card.querySelector(".bp-proc-label").textContent = label;
+    card.querySelector(".bp-proc-pct").textContent = `${pct}%`;
+    card.querySelector(".bp-proc-fill").style.transform = `scaleX(${(pct / 100).toFixed(3)})`;
+  }
 
   function setFeedback(type, msg) {
+    clearProcTimers();
     if (!msg) {
       feedback.innerHTML = "";
       return;
@@ -108,13 +159,17 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
   }
 
   function updateDetectBadge(val) {
+    if (clearBtn) clearBtn.hidden = !String(val || "").trim();
     const p = detectPlatform(val);
     if (p) {
       detectTag.textContent = p.replace("_", " ").toUpperCase();
+      detectTag.classList.add("is-detected");
     } else if (/^https?:\/\//i.test(val.trim())) {
       detectTag.textContent = "ALL LINK";
+      detectTag.classList.add("is-detected");
     } else {
       detectTag.textContent = "AUTO";
+      detectTag.classList.remove("is-detected");
     }
   }
 
@@ -123,13 +178,20 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
     btn.disabled = true;
     btn.textContent = "Menyiapkan...";
     try {
+      const thumbSrc = galleryMeta?.thumbnail || (mediaType === "image" ? remoteUrl : "");
+      const thumbFilename = thumbSrc
+        ? `thumb_${filename.replace(/\.[^.]+$/, "")}.jpg`
+        : "";
       const res = await downloadMediaFile({ API_BASE, remoteUrl, mediaType, filename });
-      if (mediaType !== "image" && prefs.autoSaveGallery !== false) {
-        saveToGallery({ ...galleryMeta, mediaUrl: remoteUrl, mediaType, filename });
+      if (prefs.autoSaveGallery !== false) {
+        saveToGallery({ ...galleryMeta, thumbnail: thumbSrc || galleryMeta?.thumbnail || "", mediaUrl: remoteUrl, mediaType, filename, thumbFilename });
+        if (thumbSrc) {
+          cacheOfflineThumb(API_BASE, thumbSrc, thumbFilename);
+        }
       }
       if (res.native) {
         setFeedback("info", `Tersimpan di ${res.path}!`);
-      } else if (mediaType !== "image" && prefs.autoSaveGallery !== false) {
+      } else if (prefs.autoSaveGallery !== false) {
         setFeedback("info", "Download dimulai & otomatis tersimpan di Galeri!");
       } else {
         setFeedback("info", "Download dimulai!");
@@ -142,10 +204,34 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
     }
   }
 
+  function renderPhotoCarouselHtml(photos, altText) {
+    if (!photos.length) return "";
+    if (photos.length === 1) {
+      const p = photos[0];
+      return `<img class="thumb pin-zoomable" data-uni-zoom="${escapeHtml(p.src)}" data-uni-zoom-idx="${p.dlIdx}" src="${escapeHtml(p.src)}" alt="${escapeHtml(altText)}" loading="lazy" title="Klik untuk perbesar" />`;
+    }
+    return `
+      <div class="uni-carousel" data-uni-carousel>
+        <div class="uni-car-track">
+          ${photos
+            .map(
+              (p, n) => `
+            <div class="uni-slide">
+              <img class="thumb pin-zoomable" data-uni-zoom="${escapeHtml(p.src)}" data-uni-zoom-idx="${p.dlIdx}" src="${escapeHtml(p.src)}" alt="${escapeHtml(altText)} ${n + 1}" loading="lazy" title="Klik untuk perbesar" />
+            </div>`
+            )
+            .join("")}
+        </div>
+        <button type="button" class="uni-car-btn prev" data-car-dir="-1" aria-label="Foto sebelumnya">&#8249;</button>
+        <button type="button" class="uni-car-btn next" data-car-dir="1" aria-label="Foto berikutnya">&#8250;</button>
+        <span class="uni-car-count">1 / ${photos.length}</span>
+      </div>
+    `;
+  }
+
   function renderFrame({ badge, mediaHtml, author, avatarUrl, title, chips = [], actionsHtml, extraHtml = "", onDownload }) {
     activeDownloadFn = onDownload;
     activeCopyText = title || "";
-    setFeedback("", "");
 
     const avatarHtml = avatarUrl
       ? `<img class="author-avatar" src="${escapeHtml(makeProxyUrl(API_BASE, avatarUrl))}" alt="Avatar" loading="lazy" />`
@@ -190,9 +276,35 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
     `;
 
     const v = resultEl.querySelector("video.video-preview");
-    if (v) v.play().catch(() => {});
+    if (v) {
+      v.muted = false;
+      v.play().catch(() => {
+        v.muted = true;
+        v.play().catch(() => {});
+      });
+    }
     const a = resultEl.querySelector("audio.audio-preview");
     if (a) a.play().catch(() => {});
+
+    resultEl.querySelectorAll("[data-uni-carousel]").forEach((car) => {
+      const track = car.querySelector(".uni-car-track");
+      const countEl = car.querySelector(".uni-car-count");
+      const total = car.querySelectorAll(".uni-slide").length;
+      if (!track || total < 2) return;
+      const syncCount = () => {
+        const w = track.clientWidth || 1;
+        const idx = Math.max(0, Math.min(total - 1, Math.round(track.scrollLeft / w)));
+        if (countEl) countEl.textContent = `${idx + 1} / ${total}`;
+      };
+      track.addEventListener("scroll", syncCount, { passive: true });
+      car.querySelectorAll("[data-car-dir]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const dir = Number(btn.dataset.carDir || 1);
+          track.scrollBy({ left: dir * (track.clientWidth || 300), behavior: "smooth" });
+        });
+      });
+    });
   }
 
   async function processUrl(rawUrl, ytOpts = { type: "video", quality: "720p" }) {
@@ -208,8 +320,26 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
 
     submitBtn.disabled = true;
     submitBtn.textContent = "Memproses...";
-    setFeedback("info", `Mendeteksi ${(platform || "all link").replace("_", " ").toUpperCase()}...`);
     resultEl.innerHTML = "";
+    clearProcTimers();
+    const pName = (platform || "all link").replace("_", " ").toUpperCase();
+    renderProcCard(15, `Mendeteksi ${pName}...`, "loading");
+    procTimers.push(setTimeout(() => renderProcCard(42, `Menghubungi server ${pName}...`, "loading"), 350));
+    procTimers.push(setTimeout(() => renderProcCard(72, `Mengambil media & stream...`, "loading"), 1100));
+    procTimers.push(setTimeout(() => renderProcCard(88, `Menyiapkan preview...`, "loading"), 2400));
+
+    const finishSuccess = () => {
+      clearProcTimers();
+      renderProcCard(100, `Selesai!`, "success");
+      procExitTimer = setTimeout(() => {
+        const card = feedback.querySelector(".bp-proc-card");
+        if (!card) return;
+        card.classList.add("is-exit");
+        setTimeout(() => {
+          if (feedback.contains(card)) feedback.innerHTML = "";
+        }, 340);
+      }, 520);
+    };
 
     try {
       if (platform === "tiktok") {
@@ -226,16 +356,25 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
         if (data.music && !downloads.some((d) => d.url === data.music.url)) {
           downloads.push({ type: "audio_mp3", label: data.music.label || "Unduh MP3", url: data.music.url });
         }
+        const images = downloads.filter((d) => d.type === "image");
+        const audio = downloads.find((d) => d.type === "audio_mp3");
         const preview =
           downloads.find((d) => d.type === "video_hd_no_watermark") ||
           downloads.find((d) => d.type === "video_no_watermark") ||
-          downloads.find((d) => d.type !== "audio_mp3");
+          downloads.find((d) => d.type !== "audio_mp3" && d.type !== "image");
+
+        const photos = downloads
+          .map((dl, i) => (dl.type === "image" ? { src: makeProxyUrl(API_BASE, dl.url), dlIdx: i } : null))
+          .filter(Boolean);
+        const mediaHtml = photos.length
+          ? `${renderPhotoCarouselHtml(photos, "TikTok Foto")}${audio ? `<audio class="audio-preview" src="${escapeHtml(makeProxyUrl(API_BASE, audio.url))}" controls preload="auto"></audio>` : ""}`
+          : preview
+            ? `<video class="video-preview" src="${escapeHtml(makeProxyUrl(API_BASE, preview.url))}" ${data.thumbnail ? `poster="${escapeHtml(data.thumbnail)}"` : ""} controls autoplay muted playsinline loop preload="auto"></video>`
+            : "";
 
         renderFrame({
           badge: "TIKTOK",
-          mediaHtml: preview
-            ? `<video class="video-preview" src="${escapeHtml(makeProxyUrl(API_BASE, preview.url))}" ${data.thumbnail ? `poster="${escapeHtml(data.thumbnail)}"` : ""} controls autoplay muted playsinline loop preload="auto"></video>`
-            : "",
+          mediaHtml,
           author: data.author || "TikTok",
           avatarUrl: data.avatar,
           title: data.title,
@@ -246,12 +385,13 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
           onDownload: (btn, idx) => {
             const dl = downloads[idx];
             const isAudio = dl.type === "audio_mp3";
-            const ext = isAudio ? "mp3" : "mp4";
+            const isImg = dl.type === "image";
+            const ext = isAudio ? "mp3" : isImg ? "jpg" : "mp4";
             triggerDownload(btn, {
               remoteUrl: dl.url,
-              mediaType: isAudio ? "audio" : "video",
+              mediaType: isAudio ? "audio" : isImg ? "image" : "video",
               filename: `tiktok_${Date.now().toString().slice(-6)}.${ext}`,
-              galleryMeta: { url, author: data.author, title: data.title, thumbnail: data.thumbnail },
+              galleryMeta: { url, author: data.author, title: data.title, thumbnail: data.thumbnail || photos[0] || data.avatar || "" },
             });
           },
         });
@@ -337,7 +477,6 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Gagal mengambil playlist Spotify");
-        setFeedback("", "");
         const tracksHtml = (data.tracks || [])
           .map(
             (tr) => `
@@ -365,15 +504,20 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Gagal mengambil media Instagram");
         const items = data.items || [];
-        const mediaHtml = items
+        const igVideos = items
           .map((it) => {
             const isVid = it.type === "mp4" || it.type === "video";
-            const src = makeProxyUrl(API_BASE, it.url);
             return isVid
-              ? `<video class="video-preview" src="${escapeHtml(src)}" controls autoplay muted playsinline loop preload="auto"></video>`
-              : `<img class="thumb" src="${escapeHtml(src)}" alt="Instagram" loading="lazy" />`;
+              ? `<video class="video-preview" src="${escapeHtml(makeProxyUrl(API_BASE, it.url))}" controls autoplay muted playsinline loop preload="auto"></video>`
+              : "";
           })
           .join("");
+        const igPhotos = items
+          .map((it, i) =>
+            it.type === "mp4" || it.type === "video" ? null : { src: makeProxyUrl(API_BASE, it.url), dlIdx: i }
+          )
+          .filter(Boolean);
+        const mediaHtml = `${igVideos}${renderPhotoCarouselHtml(igPhotos, "Instagram")}`;
         renderFrame({
           badge: "INSTAGRAM",
           mediaHtml,
@@ -451,16 +595,16 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Gagal mengambil media Pinterest");
         const items = data.items || [];
+        const pinPhotos = items
+          .map((it, i) => (it.isVideo ? null : { src: makeProxyUrl(API_BASE, it.url), dlIdx: i }))
+          .filter(Boolean);
+        const pinVideos = items
+          .filter((it) => it.isVideo)
+          .map((it) => `<video class="video-preview" src="${escapeHtml(makeProxyUrl(API_BASE, it.url))}" controls autoplay muted playsinline loop preload="auto"></video>`)
+          .join("");
         renderFrame({
           badge: "PINTEREST",
-          mediaHtml: items
-            .map((it, i) => {
-              const src = makeProxyUrl(API_BASE, it.url);
-              return it.isVideo
-                ? `<video class="video-preview" src="${escapeHtml(src)}" controls autoplay muted playsinline loop preload="auto"></video>`
-                : `<img class="thumb pin-zoomable" data-uni-zoom="${escapeHtml(src)}" data-uni-zoom-idx="${i}" src="${escapeHtml(src)}" alt="Pinterest" loading="lazy" title="Klik untuk perbesar" />`;
-            })
-            .join(""),
+          mediaHtml: `${pinVideos}${renderPhotoCarouselHtml(pinPhotos, "Pinterest")}`,
           author: "Pinterest",
           chips: items[0]?.width && items[0]?.height ? [`${items[0].width} × ${items[0].height}`] : [],
           actionsHtml: items
@@ -493,12 +637,13 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
         const posterAttr = data.thumbnail
           ? `poster="${escapeHtml(makeProxyUrl(API_BASE, data.thumbnail))}"`
           : "";
+        const socialPhotos = dls
+          .map((im, i) => (im.type === "image" ? { src: makeProxyUrl(API_BASE, im.url), dlIdx: i } : null))
+          .filter(Boolean);
         const mediaHtml = vid
           ? `<video class="video-preview" src="${escapeHtml(makeProxyUrl(API_BASE, vid.url))}" ${posterAttr} controls autoplay muted playsinline loop preload="auto"></video>`
-          : imgs.length
-            ? imgs
-                .map((im) => `<img class="thumb" src="${escapeHtml(makeProxyUrl(API_BASE, im.url))}" alt="${escapeHtml(platform)}" loading="lazy" />`)
-                .join("")
+          : socialPhotos.length
+            ? renderPhotoCarouselHtml(socialPhotos, platform)
             : aud
               ? `<audio class="audio-preview" src="${escapeHtml(makeProxyUrl(API_BASE, aud.url))}" controls autoplay preload="auto"></audio>`
               : "";
@@ -543,10 +688,11 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
         const vid = dls.find((d) => d.type === "video");
         const img = dls.find((d) => d.type === "image");
         const aud = dls.find((d) => d.type === "audio");
+        const imgIdx = dls.findIndex((d) => d.type === "image");
         const mediaHtml = vid
           ? `<video class="video-preview" src="${escapeHtml(makeProxyUrl(API_BASE, vid.url))}" ${data.thumbnail ? `poster="${escapeHtml(data.thumbnail)}"` : ""} controls autoplay muted playsinline loop preload="auto"></video>`
           : img
-            ? `<img class="thumb" src="${escapeHtml(makeProxyUrl(API_BASE, img.url))}" alt="Media" loading="lazy" />`
+            ? `<img class="thumb pin-zoomable" data-uni-zoom="${escapeHtml(makeProxyUrl(API_BASE, img.url))}" data-uni-zoom-idx="${imgIdx}" src="${escapeHtml(makeProxyUrl(API_BASE, img.url))}" alt="Media" loading="lazy" title="Klik untuk perbesar" />`
             : aud
               ? `<audio class="audio-preview" src="${escapeHtml(makeProxyUrl(API_BASE, aud.url))}" controls autoplay preload="auto"></audio>`
               : "";
@@ -571,8 +717,10 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
           },
         });
       }
+      finishSuccess();
     } catch (err) {
-      setFeedback("error", err.message || "Gagal memproses link.");
+      clearProcTimers();
+      renderProcCard(100, err.message || "Gagal memproses link.", "error");
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = "Proses";
@@ -585,6 +733,14 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
   });
 
   input.addEventListener("input", () => updateDetectBadge(input.value));
+
+  clearBtn?.addEventListener("click", () => {
+    input.value = "";
+    updateDetectBadge("");
+    setFeedback("", "");
+    resultEl.innerHTML = "";
+    input.focus();
+  });
 
   input.addEventListener("paste", () => {
     setTimeout(() => {
@@ -626,29 +782,84 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
   resultEl.addEventListener("click", async (e) => {
     const zoomImg = e.target.closest("[data-uni-zoom]");
     if (zoomImg) {
-      const src = zoomImg.dataset.uniZoom;
-      const idx = Number(zoomImg.dataset.uniZoomIdx || 0);
+      const allSlides = Array.from(resultEl.querySelectorAll("[data-uni-zoom]")).map((el) => ({
+        src: el.dataset.uniZoom,
+        dlIdx: Number(el.dataset.uniZoomIdx || 0),
+      }));
+      let activeSlideIdx = Math.max(
+        0,
+        allSlides.findIndex(
+          (s) => s.src === zoomImg.dataset.uniZoom && s.dlIdx === Number(zoomImg.dataset.uniZoomIdx || 0)
+        )
+      );
+      if (!allSlides.length) {
+        allSlides.push({
+          src: zoomImg.dataset.uniZoom,
+          dlIdx: Number(zoomImg.dataset.uniZoomIdx || 0),
+        });
+      }
+
       const existing = document.getElementById("pinLightbox");
       if (existing) existing.remove();
       const modal = document.createElement("div");
       modal.id = "pinLightbox";
       modal.className = "pin-lightbox";
+      const multi = allSlides.length > 1;
       modal.innerHTML = `
         <div class="pin-lightbox-box">
           <div class="pin-lightbox-bar">
-            <span class="tag">FULL IMAGE</span>
+            <span class="tag">FULL PHOTO</span>
             <button type="button" class="btn btn-sm" id="pinLbClose">Tutup ✕</button>
           </div>
-          <img class="pin-lightbox-img" src="${escapeHtml(src)}" alt="Full Preview" />
-          <button type="button" class="btn btn-success pin-lightbox-dl" id="pinLbDl">Unduh Gambar</button>
+          <div class="pin-lightbox-mat">
+            ${
+              multi
+                ? `<div class="uni-carousel" id="pinLbCarousel">
+                    <div class="uni-car-track">
+                      ${allSlides
+                        .map(
+                          (s, n) => `
+                        <div class="uni-slide">
+                          <img class="pin-lightbox-img" src="${escapeHtml(s.src)}" alt="Full Preview ${n + 1}" />
+                        </div>`
+                        )
+                        .join("")}
+                    </div>
+                    <button type="button" class="uni-car-btn prev" data-lb-dir="-1" aria-label="Foto sebelumnya">&#8249;</button>
+                    <button type="button" class="uni-car-btn next" data-lb-dir="1" aria-label="Foto berikutnya">&#8250;</button>
+                    <span class="uni-car-count" id="pinLbCount">${activeSlideIdx + 1} / ${allSlides.length}</span>
+                  </div>`
+                : `<img class="pin-lightbox-img" src="${escapeHtml(allSlides[0].src)}" alt="Full Preview" />`
+            }
+          </div>
+          <button type="button" class="btn btn-success pin-lightbox-dl" id="pinLbDl">Unduh Foto</button>
         </div>
       `;
+
+      const track = modal.querySelector(".uni-car-track");
+      const countEl = modal.querySelector("#pinLbCount");
+      const syncSlide = () => {
+        if (!track) return;
+        const w = track.clientWidth || 1;
+        activeSlideIdx = Math.max(0, Math.min(allSlides.length - 1, Math.round(track.scrollLeft / w)));
+        if (countEl) countEl.textContent = `${activeSlideIdx + 1} / ${allSlides.length}`;
+      };
+      const stepSlide = (dir) => {
+        if (!track) return;
+        track.scrollBy({ left: dir * (track.clientWidth || 300), behavior: "smooth" });
+      };
+      if (track) {
+        track.addEventListener("scroll", syncSlide, { passive: true });
+      }
+
       const close = () => {
         document.removeEventListener("keydown", onKey);
         modal.remove();
       };
       const onKey = (ev) => {
         if (ev.key === "Escape") close();
+        else if (multi && ev.key === "ArrowLeft") stepSlide(-1);
+        else if (multi && ev.key === "ArrowRight") stepSlide(1);
       };
       document.addEventListener("keydown", onKey);
       modal.addEventListener("click", (ev) => {
@@ -656,12 +867,23 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
           close();
           return;
         }
+        const dirBtn = ev.target.closest("[data-lb-dir]");
+        if (dirBtn) {
+          stepSlide(Number(dirBtn.dataset.lbDir || 1));
+          return;
+        }
         const dl = ev.target.closest("#pinLbDl");
         if (dl && !dl.disabled && activeDownloadFn) {
-          activeDownloadFn(dl, idx);
+          const targetSlide = allSlides[activeSlideIdx] || allSlides[0];
+          activeDownloadFn(dl, targetSlide.dlIdx);
         }
       });
       document.body.appendChild(modal);
+      if (track && activeSlideIdx > 0) {
+        requestAnimationFrame(() => {
+          track.scrollTo({ left: activeSlideIdx * (track.clientWidth || 0), behavior: "auto" });
+        });
+      }
       return;
     }
 

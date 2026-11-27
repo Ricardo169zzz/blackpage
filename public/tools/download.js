@@ -13,6 +13,57 @@ export function makeProxyUrl(API_BASE, remoteUrl, { download = false, filename =
   return `${API_BASE}/api/media?${params.toString()}`;
 }
 
+const THUMB_CACHE_NAME = "blackpage-thumbs-v1";
+
+export async function cacheOfflineThumb(API_BASE, thumbUrl, thumbFilename = "") {
+  if (!thumbUrl) return;
+  const proxyUrl = makeProxyUrl(API_BASE, thumbUrl);
+  const cap = window.Capacitor;
+  const fs = cap?.Plugins?.Filesystem;
+  if (cap?.isNativePlatform?.() && fs && thumbFilename) {
+    try {
+      await fs.mkdir({ path: "Download/Blackpage/thumb", directory: "EXTERNAL_STORAGE", recursive: true }).catch(() => {});
+      await fs.downloadFile({
+        url: proxyUrl,
+        path: `Download/Blackpage/thumb/${thumbFilename}`,
+        directory: "EXTERNAL_STORAGE",
+      });
+    } catch {}
+  }
+  if (typeof caches !== "undefined") {
+    try {
+      const cache = await caches.open(THUMB_CACHE_NAME);
+      await cache.add(proxyUrl);
+    } catch {}
+  }
+}
+
+export async function resolveOfflineThumbSrc(API_BASE, item) {
+  if (!item) return "";
+  const cap = window.Capacitor;
+  const fs = cap?.Plugins?.Filesystem;
+  if (cap?.isNativePlatform?.() && fs && item.thumbFilename) {
+    const path = `Download/Blackpage/thumb/${item.thumbFilename}`;
+    try {
+      await fs.stat({ path, directory: "EXTERNAL_STORAGE" });
+      const res = await fs.getUri({ path, directory: "EXTERNAL_STORAGE" });
+      const uri = res?.uri || "";
+      if (uri) return typeof cap.convertFileSrc === "function" ? cap.convertFileSrc(uri) : uri;
+    } catch {}
+  }
+  if (typeof caches !== "undefined" && item.thumbnail) {
+    try {
+      const cache = await caches.open(THUMB_CACHE_NAME);
+      const match = await cache.match(makeProxyUrl(API_BASE, item.thumbnail));
+      if (match) {
+        const blob = await match.blob();
+        return URL.createObjectURL(blob);
+      }
+    } catch {}
+  }
+  return "";
+}
+
 function escapeAttr(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")
@@ -97,7 +148,16 @@ function ensureToastEl() {
 function hideToastNow() {
   clearTimeout(toastState.morphTimer);
   clearTimeout(toastState.hideTimer);
-  if (toastState.el) toastState.el.hidden = true;
+  if (toastState.el) {
+    toastState.el.classList.add("is-hiding");
+    const target = toastState.el;
+    setTimeout(() => {
+      if (toastState.status === "idle") {
+        target.hidden = true;
+        target.classList.remove("is-hiding");
+      }
+    }, 240);
+  }
   toastState.isCircle = false;
   toastState.status = "idle";
 }
@@ -113,73 +173,30 @@ function scheduleMorphToCircle() {
   }, 3000);
 }
 
-const RING_CIRCUMFERENCE = 125.66; // 2 * PI * 20
-let renderedMode = ""; // "circle" | "rect"
-let renderedStatus = "";
+const RING_CIRCUMFERENCE = 113.1; // 2 * PI * 18
 
 function renderToast() {
   const el = ensureToastEl();
   el.hidden = false;
+  el.classList.remove("is-hiding");
   el.classList.toggle("is-circle", toastState.isCircle);
   el.classList.toggle("is-done", toastState.status === "done");
   el.classList.toggle("is-error", toastState.status === "error");
 
   const pct = typeof toastState.percent === "number" ? Math.max(0, Math.min(100, toastState.percent)) : null;
-  const mode = toastState.isCircle ? "circle" : "rect";
-  const needsRebuild = renderedMode !== mode || renderedStatus !== toastState.status || !el.firstElementChild;
 
   const iconSvg =
     toastState.status === "done"
-      ? `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"><polyline points="20 6 9 17 4 12"/></svg>`
+      ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
       : toastState.status === "error"
-        ? `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
-        : `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square"><path d="M12 4v11"/><polyline points="7 11 12 16 17 11"/><path d="M5 20h14"/></svg>`;
+        ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+        : `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><polyline points="7 11 12 16 17 11"/><path d="M5 20h14"/></svg>`;
 
-  if (mode === "circle") {
-    if (needsRebuild) {
-      el.innerHTML = `
-        <div class="dl-circle-badge" title="${escapeAttr(toastState.filename || "Mengunduh")}">
-          <svg class="dl-circle-ring" viewBox="0 0 48 48">
-            <circle class="dl-ring-track" cx="24" cy="24" r="20" />
-            <circle class="dl-ring-fill" cx="24" cy="24" r="20" style="stroke-dasharray:${RING_CIRCUMFERENCE};stroke-dashoffset:${RING_CIRCUMFERENCE}" />
-          </svg>
-          <span class="dl-circle-icon">${iconSvg}</span>
-          <span class="dl-circle-pct" hidden></span>
-        </div>
-      `;
-      renderedMode = mode;
-      renderedStatus = toastState.status;
-    }
-
-    const ringEl = el.querySelector(".dl-circle-ring");
-    const ringFill = el.querySelector(".dl-ring-fill");
-    const pctBadge = el.querySelector(".dl-circle-pct");
-    const isSpin = pct === null && toastState.status === "downloading";
-    const ringOffset =
-      toastState.status === "done"
-        ? 0
-        : pct === null
-          ? RING_CIRCUMFERENCE * 0.65
-          : RING_CIRCUMFERENCE * (1 - pct / 100);
-
-    if (ringEl) ringEl.classList.toggle("is-spin", isSpin);
-    if (ringFill) ringFill.style.strokeDashoffset = ringOffset.toFixed(2);
-    if (pctBadge) {
-      if (pct !== null && toastState.status === "downloading") {
-        pctBadge.hidden = false;
-        pctBadge.textContent = `${pct}%`;
-      } else {
-        pctBadge.hidden = true;
-      }
-    }
-    return;
-  }
-
-  if (needsRebuild) {
+  if (!el.querySelector(".dl-toast-rect") || !el.querySelector(".dl-circle-badge")) {
     el.innerHTML = `
       <div class="dl-toast-rect">
         <div class="dl-toast-row">
-          <span class="dl-toast-badge">${iconSvg}</span>
+          <span class="dl-toast-badge"></span>
           <div class="dl-toast-info">
             <div class="dl-toast-title"></div>
             <div class="dl-toast-sub"></div>
@@ -191,10 +208,45 @@ function renderToast() {
           <div class="dl-progress-fill"></div>
         </div>
       </div>
+      <div class="dl-circle-badge">
+        <svg class="dl-circle-ring" viewBox="0 0 44 44">
+          <circle class="dl-ring-track" cx="22" cy="22" r="18" />
+          <circle class="dl-ring-fill" cx="22" cy="22" r="18" style="stroke-dasharray:${RING_CIRCUMFERENCE};stroke-dashoffset:${RING_CIRCUMFERENCE}" />
+        </svg>
+        <span class="dl-circle-icon"></span>
+        <span class="dl-circle-pct" hidden></span>
+      </div>
     `;
-    renderedMode = mode;
-    renderedStatus = toastState.status;
   }
+
+  const circleBadge = el.querySelector(".dl-circle-badge");
+  const ringEl = el.querySelector(".dl-circle-ring");
+  const ringFill = el.querySelector(".dl-ring-fill");
+  const circleIcon = el.querySelector(".dl-circle-icon");
+  const pctBadge = el.querySelector(".dl-circle-pct");
+  const isSpin = pct === null && toastState.status === "downloading";
+  const ringOffset =
+    toastState.status === "done"
+      ? 0
+      : pct === null
+        ? RING_CIRCUMFERENCE * 0.68
+        : RING_CIRCUMFERENCE * (1 - pct / 100);
+
+  if (circleBadge) circleBadge.title = toastState.filename || "Mengunduh";
+  if (circleIcon) circleIcon.innerHTML = iconSvg;
+  if (ringEl) ringEl.classList.toggle("is-spin", isSpin);
+  if (ringFill) ringFill.style.strokeDashoffset = ringOffset.toFixed(2);
+  if (pctBadge) {
+    if (pct !== null && toastState.status === "downloading") {
+      pctBadge.hidden = false;
+      pctBadge.textContent = `${pct}%`;
+    } else {
+      pctBadge.hidden = true;
+    }
+  }
+
+  const rectBadge = el.querySelector(".dl-toast-badge");
+  if (rectBadge) rectBadge.innerHTML = iconSvg;
 
   const pctLabel =
     toastState.status === "done"
@@ -309,9 +361,20 @@ function triggerBrowserDownload(href, filename) {
   a.remove();
 }
 
+function getSavedPrefs() {
+  try {
+    const raw = localStorage.getItem("tools_op_prefs_v1");
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function downloadMediaFile({ API_BASE, remoteUrl, mediaType, filename, onProgress }) {
   const cap = window.Capacitor;
   const fs = cap?.Plugins?.Filesystem;
+  const prefs = getSavedPrefs();
+  const maxAttempts = prefs.autoRetry === false ? 1 : Math.max(1, Math.min(5, Number(prefs.maxRetry) || 3));
 
   const emitProgress = (p) => {
     updateGlobalToast(p);
@@ -320,17 +383,25 @@ export async function downloadMediaFile({ API_BASE, remoteUrl, mediaType, filena
 
   beginGlobalToast(filename);
 
-  try {
-    if (cap?.isNativePlatform?.()) {
-      if (!fs) {
-        throw new Error("Plugin Filesystem belum aktif di APK. Silakan update/build ulang APK.");
-      }
-      if (!API_BASE) {
-        throw new Error("API Base URL belum diisi. Buka Setting -> Lanjutan lalu isi URL server.");
-      }
+  let lastErr = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      if (cap?.isNativePlatform?.()) {
+        if (!fs) {
+          throw new Error("Plugin Filesystem belum aktif di APK. Silakan update/build ulang APK.");
+        }
+        if (!API_BASE) {
+          throw new Error("API Base URL belum diisi. Buka Setting -> Lanjutan lalu isi URL server.");
+        }
 
-      const subDir = mediaType === "audio" ? "audio" : mediaType === "image" ? "image" : "video";
-      const dirPath = `Download/Blackpage/${subDir}`;
+        const subDir = mediaType === "audio" ? "audio" : mediaType === "image" ? "image" : "video";
+        const customDir =
+          mediaType === "audio"
+            ? prefs.audioFolder
+            : mediaType === "video"
+              ? prefs.videoFolder
+              : "";
+        const dirPath = (customDir || `Download/Blackpage/${subDir}`).replace(/^\/+|\/+$/g, "");
       const targetPath = `${dirPath}/${filename}`;
       const sourceUrl = makeProxyUrl(API_BASE, remoteUrl, { download: true, filename });
 
@@ -442,8 +513,14 @@ export async function downloadMediaFile({ API_BASE, remoteUrl, mediaType, filena
     triggerBrowserDownload(dlUrl, filename);
     endGlobalToast(true);
     return { native: false, path: filename };
-  } catch (err) {
-    endGlobalToast(false, err?.message || "Gagal mengunduh.");
-    throw err;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 700));
+        continue;
+      }
+      endGlobalToast(false, err?.message || "Gagal mengunduh.");
+      throw err;
+    }
   }
 }

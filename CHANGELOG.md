@@ -2,6 +2,23 @@
 
 Semua perubahan penting pada proyek **Blackpage** dicatat di file ini.
 
+## [1.5.0] — 2026-11-28
+
+### Fitur Baru
+- **Tab Music Khusus (Terpisah dari Galeri) & Pemutar Offline ala Spotify**:
+  - Tab **Music** terpisah di navigasi bawah, dilengkapi Hero Player, seek bar, kontrol `ACAK / PREV / PLAY-PAUSE / NEXT / ULANG`, antrean lagu, fitur **Ganti Judul (`✎`)**, serta **10 logo cover SVG geometris** fallback ([public/tools/music-covers.js](file:///e:/TOOLS%20OP/public/tools/music-covers.js)).
+  - Pop-up **CARI LAGU FAVORITMU (Spotify)** dengan daftar lagu populer, loading skeleton shimmer, serta tombol **Putar** dan **Download** (ikon SVG), lengkap dengan status `ONLINE` / `OFFLINE SIAP` dan animasi keluar smooth saat unduhan selesai `100%`.
+  - Sinkronisasi cover offline (`resolveOfflineThumbSrc`) untuk Hero Player, Antrean Lagu, Banner Mini-Player, dan Lingkaran Floating di APK Android.
+- **Background Playback & Banner Notifikasi Custom Android**:
+  - Penambahan Android `MusicService` (`mediaPlayback` Foreground Service) dengan ikon notifikasi monokrom `ic_stat_blackpage.png` dari `logo.png` dan kontrol media di [.github/workflows/build-apk.yml](file:///e:/TOOLS%20OP/.github/workflows/build-apk.yml).
+  - Peringatan izin Background & Notifikasi saat user hendak keluar aplikasi ketika lagu sedang diputar.
+- **Floating Music Banner → Lingkaran Draggable & Galeri Android**:
+  - Banner mini-player di bagian atas yang mengecil otomatis menjadi lingkaran `40px` yang dapat digeser bebas setelah 3 detik (dan memudar transparan setelah 3 detik idle), serta mengembang ke kiri/kanan sesuai posisi lingkaran.
+  - Tab **Galeri** fokus ke Foto & Video dengan grid 3 kolom ala Android (`SEMUA / FOTO / VIDEO`).
+- **Navigasi Bawah Minimalis & Indikator Proses**:
+  - Dock navigasi bawah 5 tab (`Utama`, `Tools`, `Music`, `Galeri`, `Setting`) dengan ikon SVG minimalis.
+  - Indikator progres `%` GPU-composited (`15% → 100%`) dengan animasi ceklis & keluar smooth (atau bar merah + ikon bug jika gagal), serta perbaikan animasi morphing download toast kiri bawah.
+
 ## [1.4.0] — 2026-11-26
 
 ### Fitur Baru

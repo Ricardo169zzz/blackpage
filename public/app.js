@@ -1,10 +1,13 @@
-import { downloadMediaFile, renderProgressHtml } from "./tools/download.js";
+import { downloadMediaFile, renderProgressHtml, resolveOfflineThumbSrc, cacheOfflineThumb } from "./tools/download.js";
+import { createMusicPlayer } from "./tools/music-player.js";
+import { createBgEffects } from "./tools/bg-effects.js";
+import { quranTool } from "./tools/quran.js";
 
 const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
 const THEME_KEY = "tools_op_theme_v1";
 const PREFS_KEY = "tools_op_prefs_v1";
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 const GITHUB_REPO = "Ricardo169zzz/blackpage";
 
 const DEFAULT_PREFS = {
@@ -14,6 +17,13 @@ const DEFAULT_PREFS = {
   autoUpdate: true,
   reduceMotion: false,
   autoSaveGallery: true,
+  bgEffect: "none",
+  bgBrightness: 100,
+  bgSpeed: 100,
+  videoFolder: "Download/Blackpage/video",
+  audioFolder: "Download/Blackpage/audio",
+  autoRetry: true,
+  maxRetry: 3,
 };
 
 export function getPrefs() {
@@ -186,6 +196,7 @@ const PINTEREST_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="cur
 const BRAT_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 10h10M7 14h6"/></svg>`;
 const WMP1_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 8h10M7 12h8M7 16h6"/></svg>`;
 const TTS_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+const QURAN_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5c-2.2-1.6-5.2-2-8-1.5v13c2.8-.5 5.8-.1 8 1.5 2.2-1.6 5.2-2 8-1.5V5c-2.8-.5-5.8-.1-8 1.5Z"/><line x1="12" y1="6.5" x2="12" y2="19.5"/></svg>`;
 const NOKIA_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><rect x="8" y="5" width="8" height="6"/><path d="M9 15h.01M12 15h.01M15 15h.01M9 18h.01M12 18h.01M15 18h.01"/></svg>`;
 const IQC_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>`;
 const AIO_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
@@ -250,6 +261,13 @@ const TOOLS = [
     color: "card-cyan",
   },
   {
+    ...quranTool,
+    shortName: "Al-Qur'an",
+    icon: QURAN_SVG,
+    category: "Islami",
+    color: "card-white",
+  },
+  {
     id: "ai-assistant",
     name: "AI Assistant",
     shortName: "AI",
@@ -278,6 +296,7 @@ const TOOLS = [
 const TOOL_GROUPS = [
   { id: "Sticker", label: "Sticker", desc: "Buat stiker & kutipan cepat", icon: BRAT_SVG, color: "card-yellow" },
   { id: "MP3 & Audio", label: "MP3 & Audio", desc: "Konversi teks & olah audio", icon: TTS_SVG, color: "card-cyan" },
+  { id: "Islami", label: "Islami", desc: "Al-Qur'an digital & cari surah", icon: QURAN_SVG, color: "card-white" },
   { id: "AI & Utility", label: "AI & Utility", desc: "Asisten & utilitas tambahan", icon: "UT", color: "card-white" },
 ];
 
@@ -285,7 +304,7 @@ let activePage = "home"; // "home" | "tools" | "gallery" | "gallery:<idx>" | "se
 let prevPage = "home";
 let searchQuery = "";
 let openToolGroup = null;
-let galleryFilter = "ALL"; // "ALL" | "VIDEO" | "MP3"
+let galleryFilter = "MEDIA"; // "MEDIA" | "MUSIC"
 let hasPlayedHomeStagger = false;
 let activeStageAnim = null;
 let comicController = null;
@@ -293,12 +312,325 @@ let comicController = null;
 const navEl = document.getElementById("toolNav");
 const stageEl = document.getElementById("toolStage");
 const statusEl = document.getElementById("serverStatus");
+const miniPlayerEl = document.getElementById("bpMiniPlayer");
+
+let lastMiniTrackKey = "";
+let lastTabRenderKey = "";
+let miniCollapseTimer = null;
+let miniIdleTimer = null;
+let miniCirclePos = null; // { x, y }
+
+function clearMiniTimers() {
+  if (miniCollapseTimer) {
+    clearTimeout(miniCollapseTimer);
+    miniCollapseTimer = null;
+  }
+  if (miniIdleTimer) {
+    clearTimeout(miniIdleTimer);
+    miniIdleTimer = null;
+  }
+}
+
+function getShellSize() {
+  const shell = miniPlayerEl?.closest(".app-shell");
+  return {
+    w: shell?.clientWidth || 360,
+    h: shell?.clientHeight || 720,
+  };
+}
+
+function getDefaultCirclePos() {
+  const { w } = getShellSize();
+  return { x: Math.max(12, w - 40 - 12), y: 64 };
+}
+
+function scheduleMiniIdleFade() {
+  if (miniIdleTimer) clearTimeout(miniIdleTimer);
+  if (!miniPlayerEl || miniPlayerEl.hidden || !miniPlayerEl.classList.contains("is-circle")) return;
+  miniPlayerEl.classList.remove("is-idle");
+  miniIdleTimer = setTimeout(() => {
+    if (miniPlayerEl && !miniPlayerEl.hidden && miniPlayerEl.classList.contains("is-circle")) {
+      miniPlayerEl.classList.add("is-idle");
+    }
+  }, 3000);
+}
+
+function collapseToCircle() {
+  if (!miniPlayerEl || miniPlayerEl.hidden) return;
+  if (!miniCirclePos) miniCirclePos = getDefaultCirclePos();
+  const { w, h } = getShellSize();
+  const x = Math.max(8, Math.min(w - 48, miniCirclePos.x));
+  const y = Math.max(58, Math.min(h - 60, miniCirclePos.y));
+  miniCirclePos = { x, y };
+  const isLeft = x + 20 < w / 2;
+  miniPlayerEl.classList.toggle("from-left", isLeft);
+  miniPlayerEl.classList.add("is-circle");
+  miniPlayerEl.style.left = `${x}px`;
+  miniPlayerEl.style.top = `${y}px`;
+  miniPlayerEl.style.width = "40px";
+  miniPlayerEl.style.height = "40px";
+  scheduleMiniIdleFade();
+}
+
+function scheduleMiniCollapse() {
+  clearMiniTimers();
+  if (!miniPlayerEl || miniPlayerEl.hidden) return;
+  miniCollapseTimer = setTimeout(collapseToCircle, 3000);
+}
+
+function expandMiniBanner() {
+  if (!miniPlayerEl) return;
+  clearMiniTimers();
+  if (!miniCirclePos) miniCirclePos = getDefaultCirclePos();
+  const { w, h } = getShellSize();
+  const bannerW = Math.min(336, Math.max(240, w - 24));
+  const isLeft = miniCirclePos.x + 20 < w / 2;
+  const bannerLeft = isLeft
+    ? Math.max(12, Math.min(miniCirclePos.x, w - bannerW - 12))
+    : Math.max(12, Math.min(miniCirclePos.x + 40 - bannerW, w - bannerW - 12));
+  const bannerTop = Math.max(58, Math.min(miniCirclePos.y - 5, h - 66));
+
+  miniPlayerEl.classList.toggle("from-left", isLeft);
+  miniPlayerEl.classList.remove("is-circle", "is-idle");
+  miniPlayerEl.style.left = `${bannerLeft}px`;
+  miniPlayerEl.style.top = `${bannerTop}px`;
+  miniPlayerEl.style.width = `${bannerW}px`;
+  miniPlayerEl.style.height = "50px";
+  scheduleMiniCollapse();
+}
+
+function renameGalleryItem(idx, newTitle) {
+  const items = loadGalleryItems();
+  if (!items[idx]) return false;
+  items[idx].title = String(newTitle || "").trim();
+  try {
+    localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(items));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function saveMusicTrack(entry) {
+  const list = loadGalleryItems().filter((x) => !(x.url === entry.url && x.mediaUrl === entry.mediaUrl));
+  list.unshift({
+    url: entry.url,
+    author: entry.author || "Spotify",
+    title: entry.title || entry.url,
+    thumbnail: entry.thumbnail || null,
+    mediaUrl: entry.mediaUrl,
+    mediaType: "audio",
+    filename: entry.filename || `spotify_${Date.now().toString().slice(-6)}.mp3`,
+    thumbFilename: "",
+    downloadedAt: Date.now(),
+  });
+  try {
+    localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(list.slice(0, 30)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function markTrackDownloaded(idx, filename, thumbFilename) {
+  const list = loadGalleryItems();
+  if (!list[idx]) return false;
+  list[idx].filename = filename || list[idx].filename;
+  if (thumbFilename) list[idx].thumbFilename = thumbFilename;
+  list[idx].offlineSaved = true;
+  try {
+    localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(list));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function downloadMusicTrack(track, onProgress) {
+  if (!track?.mediaUrl) throw new Error("URL audio tidak tersedia");
+  const apiBase = getApiBase();
+  const safeName = (track.title || track.author || "blackpage_audio")
+    .replace(/[^a-z0-9_-]+/gi, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48) || "blackpage_audio";
+  const filename = track.filename || `${safeName}.mp3`;
+  const thumbFilename = track.thumbnail ? `thumb_${filename.replace(/\.[^.]+$/, "")}.jpg` : "";
+  const res = await downloadMediaFile({
+    API_BASE: apiBase,
+    remoteUrl: track.mediaUrl,
+    mediaType: "audio",
+    filename,
+    onProgress,
+  });
+  if (track.thumbnail && thumbFilename) {
+    cacheOfflineThumb(apiBase, track.thumbnail, thumbFilename);
+  }
+  markTrackDownloaded(track.galleryIdx, filename, thumbFilename);
+  return res;
+}
+
+const musicPlayer = createMusicPlayer({
+  loadGalleryItems,
+  renameGalleryItem,
+  saveTrack: saveMusicTrack,
+  downloadTrack: downloadMusicTrack,
+  resolveOfflineMediaSrc,
+  resolveOfflineThumbSrc,
+  getApiBase,
+  getLang,
+  onStateChange: (snap) => {
+    const cur = snap.track;
+    const miniTrackId = cur ? `${cur.galleryIdx}|${snap.isOffline}` : "";
+    const miniTitleText = cur ? (cur.title?.trim() || cur.author?.trim() || "Blackpage Music") : "";
+    if (miniPlayerEl) {
+      if (!cur) {
+        lastMiniTrackKey = "";
+        clearMiniTimers();
+        miniPlayerEl.classList.remove("is-circle", "is-idle");
+        musicPlayer.renderMiniPlayer(miniPlayerEl);
+      } else if (miniTrackId !== lastMiniTrackKey || !miniPlayerEl.querySelector("#miniPlayBtn")) {
+        lastMiniTrackKey = miniTrackId;
+        musicPlayer.renderMiniPlayer(miniPlayerEl);
+        expandMiniBanner();
+      } else {
+        const pct = snap.duration > 0 ? Math.min(100, (snap.currentTime / snap.duration) * 100) : 0;
+        const bar = miniPlayerEl.querySelector(".bp-mini-progress");
+        const playBtn = miniPlayerEl.querySelector("#miniPlayBtn");
+        const titleEl = miniPlayerEl.querySelector("#miniOpenMusicBtn strong");
+        const circleImg = miniPlayerEl.querySelector(".bp-mini-circle-img");
+        const circleDot = miniPlayerEl.querySelector(".bp-mini-circle-dot");
+        if (bar) bar.style.transform = `scaleX(${(pct / 100).toFixed(3)})`;
+        if (playBtn) playBtn.textContent = snap.isPlaying ? "⏸" : "▶";
+        if (titleEl && titleEl.textContent !== miniTitleText) titleEl.textContent = miniTitleText;
+        if (circleImg) circleImg.classList.toggle("is-spinning", Boolean(snap.isPlaying));
+        if (circleDot) {
+          circleDot.innerHTML = snap.isPlaying
+            ? `<svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><rect x="1" y="5" width="2" height="6" rx="1"/><rect x="5" y="2" width="2" height="9" rx="1"/><rect x="9" y="4" width="2" height="7" rx="1"/></svg>`
+            : `<svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><rect x="2.5" y="2" width="2.5" height="8" rx="0.8"/><rect x="7" y="2" width="2.5" height="8" rx="0.8"/></svg>`;
+        }
+      }
+    }
+
+    if (activePage === "music") {
+      const listEl = stageEl.querySelector("#musicPageRoot");
+      if (!listEl) return;
+      const tabKey = `${snap.currentIdx}|${cur?.title || ""}|${snap.isPlaying}|${snap.shuffle}|${snap.repeat}|${snap.hasBgPerm}|${snap.isOffline}|${snap.error}|${snap.tracks.length}`;
+      if (tabKey !== lastTabRenderKey) {
+        lastTabRenderKey = tabKey;
+        listEl.innerHTML = musicPlayer.renderMusicTabHtml();
+        musicPlayer.bindMusicTabEvents(listEl);
+        bindThumbLoaders(listEl);
+      } else {
+        const seekInput = listEl.querySelector("#musicSeekInput");
+        const curTimeEl = listEl.querySelector("#musicCurTime");
+        const durTimeEl = listEl.querySelector("#musicDurTime");
+        const pct = snap.duration > 0 ? Math.min(100, (snap.currentTime / snap.duration) * 100) : 0;
+        if (seekInput && document.activeElement !== seekInput) {
+          seekInput.value = String(Math.round(pct * 10));
+        }
+        if (curTimeEl) curTimeEl.textContent = musicPlayer.fmtTime(snap.currentTime);
+        if (durTimeEl) durTimeEl.textContent = musicPlayer.fmtTime(snap.duration);
+      }
+    }
+  },
+});
+
+if (miniPlayerEl) {
+  let dragState = null;
+  let suppressNextClick = false;
+
+  miniPlayerEl.addEventListener("pointerdown", (e) => {
+    if (!miniPlayerEl.classList.contains("is-circle")) return;
+    const shell = miniPlayerEl.closest(".app-shell");
+    if (!shell) return;
+    const rect = miniPlayerEl.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    dragState = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: rect.left - shellRect.left,
+      origY: rect.top - shellRect.top,
+      maxX: Math.max(0, shellRect.width - rect.width - 8),
+      maxY: Math.max(0, shellRect.height - rect.height - 8),
+      moved: false,
+    };
+    miniPlayerEl.classList.add("is-dragging");
+    miniPlayerEl.setPointerCapture?.(e.pointerId);
+  });
+
+  miniPlayerEl.addEventListener("pointermove", (e) => {
+    if (!dragState || e.pointerId !== dragState.pointerId) return;
+    const dx = e.clientX - dragState.startX;
+    const dy = e.clientY - dragState.startY;
+    if (!dragState.moved && Math.hypot(dx, dy) > 6) {
+      dragState.moved = true;
+    }
+    if (!dragState.moved) return;
+    const nextX = Math.max(8, Math.min(dragState.maxX, dragState.origX + dx));
+    const nextY = Math.max(58, Math.min(dragState.maxY, dragState.origY + dy));
+    miniCirclePos = { x: nextX, y: nextY };
+    miniPlayerEl.classList.remove("is-idle");
+    miniPlayerEl.style.left = `${nextX}px`;
+    miniPlayerEl.style.top = `${nextY}px`;
+  });
+
+  const endDrag = (e) => {
+    if (!dragState || e.pointerId !== dragState.pointerId) return;
+    miniPlayerEl.classList.remove("is-dragging");
+    if (dragState.moved) {
+      suppressNextClick = true;
+      setTimeout(() => {
+        suppressNextClick = false;
+      }, 60);
+      scheduleMiniIdleFade();
+    }
+    dragState = null;
+  };
+  miniPlayerEl.addEventListener("pointerup", endDrag);
+  miniPlayerEl.addEventListener("pointercancel", endDrag);
+
+  miniPlayerEl.addEventListener("click", (e) => {
+    if (suppressNextClick) return;
+    if (miniPlayerEl.classList.contains("is-circle")) {
+      expandMiniBanner();
+      return;
+    }
+    if (e.target.closest("#miniPlayBtn")) {
+      musicPlayer.togglePlay();
+      scheduleMiniCollapse();
+    } else if (e.target.closest("#miniNextBtn")) {
+      musicPlayer.next();
+      scheduleMiniCollapse();
+    } else if (e.target.closest("#miniCloseBtn")) {
+      if (miniCollapseTimer) clearTimeout(miniCollapseTimer);
+      musicPlayer.stop();
+      lastMiniTrackKey = "";
+      miniPlayerEl.hidden = true;
+      miniPlayerEl.innerHTML = "";
+    } else if (e.target.closest("#miniOpenMusicBtn")) {
+      renderMusicPage();
+      scheduleMiniCollapse();
+    }
+  });
+}
+
+const bgEffects = createBgEffects(document.getElementById("bpBgCanvas"));
+function applyBgEffectPref() {
+  const p = getPrefs();
+  bgEffects.setConfig({
+    brightness: Number(p.bgBrightness) || 100,
+    speed: Number(p.bgSpeed) || 100,
+  });
+  bgEffects.setMode(p.bgEffect || "none");
+}
+applyBgEffectPref();
 
 function applyMotionPref() {
   document.documentElement.dataset.motion = getPrefs().reduceMotion ? "reduced" : "normal";
 }
 
-const TAB_ORDER = { home: 0, tools: 1, gallery: 2, settings: 3 };
+const TAB_ORDER = { home: 0, tools: 1, music: 2, gallery: 3, settings: 4 };
 const isSubPage = (p) =>
   p === "comic" || p.startsWith("tool:") || p.startsWith("gallery:") || p.startsWith("settings:");
 
@@ -349,26 +681,43 @@ function bindThumbLoaders(container) {
   });
 }
 
+const NAV_ICONS = {
+  home: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg>`,
+  tools: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1"/></svg>`,
+  music: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
+  gallery: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-4.5-4.5L7 20"/></svg>`,
+  settings: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2" fill="var(--surface)"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2" fill="var(--surface)"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="10" cy="18" r="2" fill="var(--surface)"/></svg>`,
+};
+
 function renderNav() {
   if (activePage !== "home") {
     stageEl.classList.remove("home-stagger", "is-waiting", "is-entering");
   }
   const isHome = activePage === "home";
   const isTools = activePage === "tools" || activePage.startsWith("tool:");
+  const isMusic = activePage === "music";
   const isGallery = activePage === "gallery" || activePage.startsWith("gallery:");
   const isSettings = activePage === "settings" || activePage.startsWith("settings:");
 
   navEl.innerHTML = `
     <button class="nav-btn ${isHome ? "active" : ""}" data-page="home">
+      ${NAV_ICONS.home}
       <span>${escapeHtml(t("nav_home"))}</span>
     </button>
     <button class="nav-btn ${isTools ? "active" : ""}" data-page="tools">
+      ${NAV_ICONS.tools}
       <span>${escapeHtml(t("nav_tools"))}</span>
     </button>
+    <button class="nav-btn ${isMusic ? "active" : ""}" data-page="music">
+      ${NAV_ICONS.music}
+      <span>Music</span>
+    </button>
     <button class="nav-btn ${isGallery ? "active" : ""}" data-page="gallery">
+      ${NAV_ICONS.gallery}
       <span>${escapeHtml(t("nav_gallery"))}</span>
     </button>
     <button class="nav-btn ${isSettings ? "active" : ""}" data-page="settings">
+      ${NAV_ICONS.settings}
       <span>${escapeHtml(t("nav_settings"))}</span>
     </button>
   `;
@@ -475,16 +824,16 @@ function renderHome(fromPopstate = false) {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"><path d="M2 4h8a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2z"/><path d="M22 4h-8a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h9z"/></svg>
       </span>
       <span class="comic-hero-text">
-        <strong>BACA KOMIK</strong>
-        <small>Manga, Manhwa &amp; Manhua Sub Indo</small>
+        <strong>${getLang() === "en" ? "READ COMICS" : "BACA KOMIK"}</strong>
+        <small>${getLang() === "en" ? "Manga, Manhwa &amp; Manhua Reader" : "Manga, Manhwa &amp; Manhua Sub Indo"}</small>
       </span>
-      <span class="tag comic-hero-pill">BUKA &rarr;</span>
+      <span class="tag comic-hero-pill">${getLang() === "en" ? "OPEN &rarr;" : "BUKA &rarr;"}</span>
     </button>
 
     <div class="panel-card">
       <div class="support-head" style="border-top:0;padding-top:0;">
         <div class="field-label" style="margin:0;">SUPPORT TOOLS</div>
-        <span class="tag">${SUPPORT_DOWNLOADERS.length} AKTIF</span>
+        <span class="tag">${SUPPORT_DOWNLOADERS.length} ${getLang() === "en" ? "ACTIVE" : "AKTIF"}</span>
       </div>
       <div class="tool-list tool-grid-3">${renderSupportDownloadersHtml()}</div>
     </div>
@@ -640,16 +989,50 @@ function loadGalleryItems() {
   }
 }
 
-function renderGalleryFilterHtml() {
-  return ["ALL", "VIDEO", "MP3"]
+function renderMusicPage(fromPopstate = false) {
+  activePage = "music";
+  pushRoute(activePage, fromPopstate);
+  renderNav();
+  stageEl.classList.remove("stage-split");
+  lastTabRenderKey = "";
+
+  stageEl.innerHTML = `
+    <div class="stage-head">
+      <div>
+        <h2 class="stage-title">MUSIC</h2>
+        <p class="stage-desc">${getLang() === "en" ? "Offline music library &amp; Spotify search." : "Pemutar musik offline &amp; pencarian lagu Spotify."}</p>
+      </div>
+    </div>
+    <div id="musicPageRoot">${musicPlayer.renderMusicTabHtml()}</div>
+  `;
+  playPageEnter();
+
+  const rootEl = stageEl.querySelector("#musicPageRoot");
+  if (rootEl) {
+    musicPlayer.bindMusicTabEvents(rootEl);
+    bindThumbLoaders(rootEl);
+  }
+}
+
+function renderGalleryFilterHtml(items = loadGalleryItems()) {
+  const mediaItems = items.filter((x) => x.mediaType !== "audio");
+  const fotoCount = mediaItems.filter((x) => x.mediaType === "image").length;
+  const videoCount = mediaItems.filter((x) => x.mediaType !== "image").length;
+  const tabs = [
+    { id: "ALL", label: `SEMUA (${mediaItems.length})` },
+    { id: "FOTO", label: `FOTO (${fotoCount})` },
+    { id: "VIDEO", label: `VIDEO (${videoCount})` },
+  ];
+  const active = ["ALL", "FOTO", "VIDEO"].includes(galleryFilter) ? galleryFilter : "ALL";
+  return tabs
     .map(
-      (f) => `
+      (tab) => `
       <button
         type="button"
-        class="cat-pill ${f === galleryFilter ? "active" : ""}"
-        data-gfilter="${f}"
+        class="cat-pill ${tab.id === active ? "active" : ""}"
+        data-gfilter="${tab.id}"
       >
-        ${f}
+        ${tab.label}
       </button>
     `
     )
@@ -658,46 +1041,47 @@ function renderGalleryFilterHtml() {
 
 function renderGalleryItemsHtml(items) {
   const apiBase = getApiBase();
+  const active = ["ALL", "FOTO", "VIDEO"].includes(galleryFilter) ? galleryFilter : "ALL";
   const indexed = items
     .map((item, idx) => ({ item, idx }))
     .filter(({ item }) => {
-      if (galleryFilter === "VIDEO") return item.mediaType !== "audio";
-      if (galleryFilter === "MP3") return item.mediaType === "audio";
+      if (item.mediaType === "audio") return false;
+      if (active === "FOTO") return item.mediaType === "image";
+      if (active === "VIDEO") return item.mediaType !== "image";
       return true;
     });
 
   if (!indexed.length) {
-    const emptyMsg = items.length
-      ? `Tidak ada item di kategori ${galleryFilter}.`
-      : "Galeri masih kosong. Video/MP3 yang berhasil kamu download akan otomatis tersimpan di sini.";
-    return `<div class="alert alert-info">${emptyMsg}</div>`;
+    return `<div class="alert alert-info">Belum ada foto atau video tersimpan. Hasil download foto/video akan otomatis muncul di galeri ini.</div>`;
   }
 
-  return indexed
-    .map(({ item, idx }) => {
-      const isAudio = item.mediaType === "audio";
-      const thumbSrc = item.thumbnail
-        ? `${apiBase}/api/media?${new URLSearchParams({ url: item.thumbnail }).toString()}`
-        : "";
-      const coverHtml = thumbSrc
-        ? `<span class="gallery-thumb-wrap is-loading"><img class="gallery-thumb" src="${escapeHtml(thumbSrc)}" alt="Sampul" loading="lazy" /></span>`
-        : `<span class="gallery-thumb gallery-thumb-fallback">${isAudio ? "MP3" : "VID"}</span>`;
+  return `
+    <div class="gallery-grid">
+      ${indexed
+      .map(({ item, idx }) => {
+        const isImage = item.mediaType === "image";
+        const rawThumb = item.thumbnail || (isImage ? item.mediaUrl : "");
+        const thumbSrc = rawThumb
+          ? `${apiBase}/api/media?${new URLSearchParams({ url: rawThumb }).toString()}`
+          : "";
+        const coverHtml = thumbSrc
+          ? `<span class="gallery-thumb-wrap is-loading"><img class="gallery-thumb" data-thumb-idx="${idx}" src="${escapeHtml(thumbSrc)}" alt="Media" loading="lazy" /></span>`
+          : `<span class="gallery-thumb gallery-thumb-fallback">${isImage ? "IMG" : "VID"}</span>`;
+        const badgeHtml = isImage
+          ? `<span class="gallery-grid-badge">FOTO</span>`
+          : `<span class="gallery-grid-badge is-video" aria-label="Video">▶</span>`;
 
-      return `
-        <button type="button" class="gallery-row-card" data-open-gallery="${idx}">
-          ${coverHtml}
-          <div class="gallery-row-body">
-            <div class="gallery-row-top">
-              <span class="tag">${isAudio ? "MP3" : "VIDEO"}</span>
-              <strong class="gallery-author">${escapeHtml(item.author || "TikTok")}</strong>
-            </div>
-            <p class="gallery-row-title">${escapeHtml(item.title || item.url)}</p>
-          </div>
-          <span class="tool-arrow" aria-hidden="true">→</span>
-        </button>
-      `;
-    })
-    .join("");
+        return `
+            <button type="button" class="gallery-grid-item" data-open-gallery="${idx}" title="${escapeHtml(item.title || item.author || "Media")}">
+              ${coverHtml}
+              ${badgeHtml}
+              <span class="gallery-grid-cap">${escapeHtml(item.author || (isImage ? "Foto" : "Video"))}</span>
+            </button>
+          `;
+      })
+      .join("")}
+    </div>
+  `;
 }
 
 function renderGallery(fromPopstate = false) {
@@ -711,14 +1095,14 @@ function renderGallery(fromPopstate = false) {
   stageEl.innerHTML = `
     <div class="stage-head">
       <div>
-        <h2 class="stage-title">Galeri</h2>
-        <p class="stage-desc">Klik item untuk memutar &amp; melihat caption lengkap.</p>
+        <h2 class="stage-title">${escapeHtml(t("nav_gallery"))}</h2>
+        <p class="stage-desc">${getLang() === "en" ? "Saved photos &amp; videos." : "Koleksi foto &amp; video tersimpan."}</p>
       </div>
-      ${items.length ? `<button type="button" class="btn btn-sm" id="clearGalleryBtn">Bersihkan</button>` : ""}
+      ${items.some((x) => x.mediaType !== "audio") ? `<button type="button" class="btn btn-sm" id="clearGalleryBtn">${getLang() === "en" ? "Clear" : "Bersihkan"}</button>` : ""}
     </div>
 
-    <div class="cat-bar" id="galleryFilterBar">${renderGalleryFilterHtml()}</div>
-    <div class="gallery-list" id="galleryList">${renderGalleryItemsHtml(items)}</div>
+    <div class="cat-bar" id="galleryFilterBar">${renderGalleryFilterHtml(items)}</div>
+    <div id="galleryList">${renderGalleryItemsHtml(items)}</div>
   `;
   playPageEnter();
 
@@ -726,19 +1110,34 @@ function renderGallery(fromPopstate = false) {
   const listEl = stageEl.querySelector("#galleryList");
   const clearBtn = stageEl.querySelector("#clearGalleryBtn");
   bindThumbLoaders(listEl);
+  const hydrateOfflineThumbs = (container) => {
+    const apiBase = getApiBase();
+    const allItems = loadGalleryItems();
+    container.querySelectorAll("img.gallery-thumb[data-thumb-idx]").forEach((img) => {
+      const it = allItems[Number(img.dataset.thumbIdx)];
+      if (!it) return;
+      resolveOfflineThumbSrc(apiBase, it).then((localThumb) => {
+        if (localThumb && img.isConnected) img.src = localThumb;
+      });
+    });
+  };
+  hydrateOfflineThumbs(listEl);
 
   filterBar.addEventListener("click", (e) => {
     const pill = e.target.closest("[data-gfilter]");
     if (!pill) return;
     galleryFilter = pill.dataset.gfilter;
-    filterBar.innerHTML = renderGalleryFilterHtml();
-    listEl.innerHTML = renderGalleryItemsHtml(loadGalleryItems());
+    const latest = loadGalleryItems();
+    filterBar.innerHTML = renderGalleryFilterHtml(latest);
+    listEl.innerHTML = renderGalleryItemsHtml(latest);
     bindThumbLoaders(listEl);
+    hydrateOfflineThumbs(listEl);
   });
 
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
-      localStorage.removeItem(TT_HISTORY_KEY);
+      const onlyMusic = loadGalleryItems().filter((x) => x.mediaType === "audio");
+      localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(onlyMusic));
       renderGallery();
     });
   }
@@ -772,6 +1171,7 @@ function renderGalleryDetail(idx, fromPopstate = false) {
 
   const apiBase = getApiBase();
   const isAudio = item.mediaType === "audio";
+  const isImage = item.mediaType === "image";
   const mediaSrc = item.mediaUrl
     ? `${apiBase}/api/media?${new URLSearchParams({ url: item.mediaUrl }).toString()}`
     : "";
@@ -782,19 +1182,21 @@ function renderGalleryDetail(idx, fromPopstate = false) {
     ? `${apiBase}/api/media?${new URLSearchParams({
       url: item.mediaUrl,
       download: "1",
-      filename: item.filename || (isAudio ? "blackpage.mp3" : "blackpage.mp4"),
+      filename: item.filename || (isAudio ? "blackpage.mp3" : isImage ? "blackpage.jpg" : "blackpage.mp4"),
     }).toString()}`
     : "#";
 
   const playerHtml =
-    mediaSrc && !isAudio
-      ? `<div class="video-wrap is-loading" id="galVideoWrap">
-          <div class="video-loader">MEMUAT VIDEO...</div>
-          <video class="video-preview" src="${escapeHtml(mediaSrc)}" ${thumbSrc ? `poster="${escapeHtml(thumbSrc)}"` : ""} controls autoplay playsinline preload="auto"></video>
-        </div>`
-      : mediaSrc && isAudio
-        ? `${thumbSrc ? `<img class="thumb" src="${escapeHtml(thumbSrc)}" alt="Sampul" />` : ""}<audio class="audio-preview" src="${escapeHtml(mediaSrc)}" controls autoplay preload="auto"></audio>`
-        : "";
+    mediaSrc && isImage
+      ? `<img class="thumb" src="${escapeHtml(mediaSrc)}" alt="Foto" style="max-height:420px;object-fit:contain;background:var(--ink);" />`
+      : mediaSrc && !isAudio
+        ? `<div class="video-wrap is-loading" id="galVideoWrap">
+            <div class="video-loader">MEMUAT VIDEO...</div>
+            <video class="video-preview" src="${escapeHtml(mediaSrc)}" ${thumbSrc ? `poster="${escapeHtml(thumbSrc)}"` : ""} controls autoplay playsinline preload="auto"></video>
+          </div>`
+        : mediaSrc && isAudio
+          ? `${thumbSrc ? `<img class="thumb" src="${escapeHtml(thumbSrc)}" alt="Sampul" />` : ""}<audio class="audio-preview" src="${escapeHtml(mediaSrc)}" controls preload="metadata"></audio>`
+          : "";
 
   const hasCaption = Boolean(item.title && item.title.trim());
 
@@ -803,7 +1205,7 @@ function renderGalleryDetail(idx, fromPopstate = false) {
       <button type="button" class="btn btn-sm" data-page="gallery">← Kembali ke Galeri</button>
       <div style="display:flex;gap:6px;align-items:center;">
         <span class="tag" id="galOfflineTag" hidden>OFFLINE</span>
-        <span class="tag">${isAudio ? "MP3" : "VIDEO"}</span>
+        <span class="tag">${isAudio ? "MP3" : isImage ? "FOTO" : "VIDEO"}</span>
       </div>
     </div>
 
@@ -811,9 +1213,9 @@ function renderGalleryDetail(idx, fromPopstate = false) {
       ${playerHtml}
       <div class="result-meta">
         <div class="author-row">
-          <span class="author-avatar author-fallback">${isAudio ? "MP3" : "VID"}</span>
+          <span class="author-avatar author-fallback">${isAudio ? "MP3" : isImage ? "IMG" : "VID"}</span>
           <div class="author-info">
-            <h3>${escapeHtml(item.author || "TikTok")}</h3>
+            <h3>${escapeHtml(item.author || "Media")}</h3>
           </div>
         </div>
 
@@ -851,7 +1253,11 @@ function renderGalleryDetail(idx, fromPopstate = false) {
     videoEl.addEventListener("loadeddata", finishLoad, { once: true });
     videoEl.addEventListener("canplay", finishLoad, { once: true });
     videoEl.addEventListener("error", finishLoad, { once: true });
+    videoEl.addEventListener("play", () => musicPlayer.pause());
     videoEl.play().catch(() => { });
+  }
+  if (audioEl) {
+    audioEl.addEventListener("play", () => musicPlayer.pause());
   }
 
   resolveOfflineMediaSrc(item).then((localSrc) => {
@@ -861,7 +1267,14 @@ function renderGalleryDetail(idx, fromPopstate = false) {
     if (offlineTag) offlineTag.hidden = false;
     mediaEl.src = localSrc;
     mediaEl.load?.();
-    mediaEl.play?.().catch(() => { });
+    if (videoEl) videoEl.play?.().catch(() => { });
+  });
+
+  resolveOfflineThumbSrc(apiBase, item).then((localThumb) => {
+    if (!localThumb || !stageEl.isConnected) return;
+    const thumbImg = stageEl.querySelector(".result-card img.thumb");
+    if (thumbImg) thumbImg.src = localThumb;
+    if (videoEl) videoEl.poster = localThumb;
   });
 
   const copyAllBtn = stageEl.querySelector("#galCopyAll");
@@ -940,7 +1353,7 @@ const SETTINGS_SECTIONS = [
   { id: "umum", num: "01", titleId: "UMUM", titleEn: "GENERAL", descId: "Bahasa aplikasi", descEn: "App language" },
   { id: "tampilan", num: "02", titleId: "TAMPILAN & RASA", titleEn: "APPEARANCE", descId: "Tema & kenyamanan visual", descEn: "Theme & visual comfort" },
   { id: "penyimpanan", num: "03", titleId: "PENYIMPANAN & UNDUHAN", titleEn: "STORAGE & DOWNLOADS", descId: "Folder download, galeri & cache", descEn: "Download folder, gallery & cache" },
-  { id: "lanjutan", num: "04", titleId: "LANJUTAN", titleEn: "ADVANCED", descId: "Koneksi API & opsi developer", descEn: "API connection & developer options" },
+  { id: "backup", num: "04", titleId: "CADANGKAN & PULIHKAN", titleEn: "BACKUP & RESTORE", descId: "Ekspor/impor data & cek server", descEn: "Export/import data & server check" },
   { id: "tentang", num: "05", titleId: "TENTANG & BANTUAN", titleEn: "ABOUT & HELP", descId: "Info aplikasi Blackpage & panduan", descEn: "Blackpage info & guide" },
 ];
 
@@ -984,37 +1397,52 @@ function renderSettings(fromPopstate = false) {
   playPageEnter();
 }
 
+function getBgEffectLabel(mode) {
+  const isEn = getLang() === "en";
+  if (mode === "stars") return isEn ? "Constellation Stars" : "Bintang (Rasi)";
+  if (mode === "rain") return isEn ? "Rain" : "Hujan";
+  return isEn ? "Off" : "Mati";
+}
+
 function renderTampilanSettings() {
   const current = getThemeMode();
   const isEn = getLang() === "en";
   const prefs = getPrefs();
-  const options = [
-    { id: "auto", title: isEn ? "Follow Android Theme" : "Ikuti Tema Android", sub: isEn ? "Automatically match system light/dark mode" : "Otomatis menyesuaikan mode terang/gelap sistem" },
-    { id: "light", title: isEn ? "Light Theme" : "Tema Terang", sub: isEn ? "Classic manga paper (#F4F1EA)" : "Kertas manga klasik (#F4F1EA)" },
-    { id: "dark", title: isEn ? "Dark Theme" : "Tema Gelap", sub: isEn ? "High-contrast dark ink (#121214)" : "Tinta gelap kontras tinggi (#121214)" },
-  ];
+  const isSystem = current === "auto";
+  const isDarkActive = isSystem
+    ? Boolean(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    : current === "dark";
+
   return `
     <div class="setting-group">
       <div class="field-label">${isEn ? "THEME" : "TEMA"}</div>
-      <div class="theme-options" id="themeOptions">
-        ${options
-      .map(
-        (o) => `
-          <button type="button" class="theme-option ${current === o.id ? "active" : ""}" data-set-theme="${o.id}">
-            <div>
-              <div class="theme-option-title">${escapeHtml(o.title)}</div>
-              <div class="theme-option-sub">${escapeHtml(o.sub)}</div>
-            </div>
-            <span class="tag">${current === o.id ? (isEn ? "ACTIVE" : "AKTIF") : (isEn ? "SELECT" : "PILIH")}</span>
-          </button>
-        `
-      )
-      .join("")}
-      </div>
+      <button type="button" class="toggle-row" id="darkModeToggleBtn" role="switch" aria-checked="${isDarkActive ? "true" : "false"}">
+        <div class="toggle-text">
+          <div class="theme-option-title">${isEn ? "Dark Mode" : "Mode Gelap"}</div>
+          <div class="theme-option-sub">${isDarkActive ? (isEn ? "Dark theme active" : "Tema gelap aktif") : (isEn ? "Light theme active" : "Tema terang aktif")}</div>
+        </div>
+        <span class="toggle-switch ${isDarkActive ? "on" : ""}"><span class="toggle-knob"></span></span>
+      </button>
+
+      <button type="button" class="toggle-row" id="systemThemeToggleBtn" role="switch" aria-checked="${isSystem ? "true" : "false"}">
+        <div class="toggle-text">
+          <div class="theme-option-title">${isEn ? "Follow System" : "Gunakan Bawaan Sistem"}</div>
+          <div class="theme-option-sub">${isEn ? "Match device light/dark mode" : "Ikuti mode terang/gelap perangkat"}</div>
+        </div>
+        <span class="toggle-switch ${isSystem ? "on" : ""}"><span class="toggle-knob"></span></span>
+      </button>
     </div>
 
     <div class="setting-group">
-      <div class="field-label">${isEn ? "MOTION" : "ANIMASI"}</div>
+      <div class="field-label">${isEn ? "BACKGROUND &amp; MOTION" : "LATAR &amp; ANIMASI"}</div>
+      <button type="button" class="toggle-row" id="openBgEffectPageBtn">
+        <div class="toggle-text">
+          <div class="theme-option-title">${isEn ? "Animated Background" : "Latar Belakang Bergerak"}</div>
+          <div class="theme-option-sub">${isEn ? "Active" : "Aktif"}: <strong>${escapeHtml(getBgEffectLabel(prefs.bgEffect))}</strong></div>
+        </div>
+        <span class="tool-arrow" aria-hidden="true">→</span>
+      </button>
+
       <button type="button" class="toggle-row" id="reduceMotionBtn" role="switch" aria-checked="${prefs.reduceMotion ? "true" : "false"}">
         <div class="toggle-text">
           <div class="theme-option-title">${isEn ? "Reduce Motion" : "Kurangi Animasi"}</div>
@@ -1026,6 +1454,125 @@ function renderTampilanSettings() {
   `;
 }
 
+const BG_EFFECT_ICONS = {
+  none: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><line x1="6.5" y1="6.5" x2="17.5" y2="17.5"/></svg>`,
+  stars: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="16" r="1.8" fill="currentColor"/><circle cx="11" cy="7" r="1.8" fill="currentColor"/><circle cx="18" cy="14" r="1.8" fill="currentColor"/><circle cx="17" cy="6" r="1.4" fill="currentColor"/><path d="M6 16 L11 7 L18 14 M11 7 L17 6"/></svg>`,
+  rain: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="7" y1="5" x2="5" y2="11"/><line x1="13" y1="4" x2="11" y2="10"/><line x1="18" y1="6" x2="16" y2="12"/><line x1="9" y1="13" x2="7" y2="19"/><line x1="15" y1="13" x2="13" y2="19"/></svg>`,
+};
+
+function renderBgEffectSettings(fromPopstate = false) {
+  activePage = "settings:tampilan:bg";
+  pushRoute(activePage, fromPopstate);
+  renderNav();
+  stageEl.classList.remove("stage-split");
+
+  const isEn = getLang() === "en";
+  const prefs = getPrefs();
+  const current = prefs.bgEffect || "none";
+  const brightness = Number(prefs.bgBrightness) || 100;
+  const speed = Number(prefs.bgSpeed) || 100;
+  const options = [
+    { id: "none", title: isEn ? "Off" : "Mati" },
+    { id: "stars", title: isEn ? "Constellation Stars" : "Bintang" },
+    { id: "rain", title: isEn ? "Rain" : "Hujan" },
+  ];
+
+  const isDisabled = current === "none";
+
+  stageEl.innerHTML = `
+    <div class="tool-topbar">
+      <button type="button" class="btn btn-sm" id="backToTampilanBtn">${isEn ? "← Back to Appearance" : "← Kembali ke Tampilan"}</button>
+      <span class="tag">${isEn ? "BACKGROUND" : "LATAR"}</span>
+    </div>
+
+    <div class="stage-head" style="margin-bottom:12px;">
+      <div>
+        <h2 class="stage-title">${isEn ? "ANIMATED BACKGROUND" : "LATAR BELAKANG BERGERAK"}</h2>
+      </div>
+    </div>
+
+    <div class="bp-bg-bento" id="bgEffectOptions">
+      ${options
+      .map(
+        (o, idx) => `
+          <button type="button" class="bp-bg-bento-card ${current === o.id ? "active" : ""}" style="--i:${idx}" data-set-bg="${o.id}">
+            <span class="bp-bg-bento-icon">${BG_EFFECT_ICONS[o.id]}</span>
+            <strong class="bp-bg-bento-title">${escapeHtml(o.title)}</strong>
+            <span class="tag">${current === o.id ? (isEn ? "ACTIVE" : "AKTIF") : (isEn ? "SELECT" : "PILIH")}</span>
+          </button>
+        `
+      )
+      .join("")}
+    </div>
+
+    ${isDisabled
+      ? `<div class="bp-bg-warn">${isEn ? "Enable an animated background first (Stars or Rain) to adjust brightness &amp; speed." : "Aktifkan animasi latar belakang terlebih dahulu untuk mengatur kecerahan &amp; kecepatan."}</div>`
+      : ""}
+
+    <div class="bp-bg-sliders ${isDisabled ? "is-disabled" : ""}">
+      <div class="bp-bg-slider-row">
+        <div class="bp-bg-slider-head">
+          <span>${isEn ? "Brightness" : "Kecerahan"}</span>
+          <strong class="tag" id="bgBrightVal">${brightness}%</strong>
+        </div>
+        <input type="range" class="bp-music-seek" id="bgBrightSlider" min="20" max="200" step="5" value="${brightness}" ${isDisabled ? "disabled" : ""} aria-label="${isEn ? "Brightness" : "Kecerahan"}" />
+      </div>
+
+      <div class="bp-bg-slider-row">
+        <div class="bp-bg-slider-head">
+          <span>${isEn ? "Speed" : "Kecepatan"}</span>
+          <strong class="tag" id="bgSpeedVal">${speed}%</strong>
+        </div>
+        <input type="range" class="bp-music-seek" id="bgSpeedSlider" min="20" max="200" step="5" value="${speed}" ${isDisabled ? "disabled" : ""} aria-label="${isEn ? "Speed" : "Kecepatan"}" />
+      </div>
+    </div>
+  `;
+  playPageEnter();
+
+  stageEl.querySelector("#backToTampilanBtn")?.addEventListener("click", () => renderSettingDetail("tampilan"));
+  stageEl.querySelector("#bgEffectOptions")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-set-bg]");
+    if (!btn) return;
+    const p = getPrefs();
+    p.bgEffect = btn.dataset.setBg;
+    savePrefs(p);
+    applyBgEffectPref();
+    renderBgEffectSettings(true);
+  });
+
+  const brightSlider = stageEl.querySelector("#bgBrightSlider");
+  const brightVal = stageEl.querySelector("#bgBrightVal");
+  if (brightSlider) {
+    brightSlider.addEventListener("input", () => {
+      const val = Number(brightSlider.value);
+      if (brightVal) brightVal.textContent = `${val}%`;
+      const p = getPrefs();
+      p.bgBrightness = val;
+      savePrefs(p);
+      applyBgEffectPref();
+    });
+  }
+
+  const speedSlider = stageEl.querySelector("#bgSpeedSlider");
+  const speedVal = stageEl.querySelector("#bgSpeedVal");
+  if (speedSlider) {
+    speedSlider.addEventListener("input", () => {
+      const val = Number(speedSlider.value);
+      if (speedVal) speedVal.textContent = `${val}%`;
+      const p = getPrefs();
+      p.bgSpeed = val;
+      savePrefs(p);
+      applyBgEffectPref();
+    });
+  }
+}
+
+function getMaxRetryLabel(val, isEn) {
+  const n = Number(val) || 3;
+  if (n === 1) return isEn ? "1 (no retry)" : "1 (tanpa ulang)";
+  return isEn ? `${n} attempts` : `${n} percobaan`;
+}
+
 function renderPenyimpananSettings() {
   const isEn = getLang() === "en";
   const prefs = getPrefs();
@@ -1034,20 +1581,43 @@ function renderPenyimpananSettings() {
   const audioCount = items.filter((x) => x.mediaType === "audio").length;
   const bytes = new Blob([localStorage.getItem(TT_HISTORY_KEY) || ""]).size;
   const kb = (bytes / 1024).toFixed(1);
+  const videoFolder = prefs.videoFolder || "Download/Blackpage/video";
+  const audioFolder = prefs.audioFolder || "Download/Blackpage/audio";
 
   return `
     <div class="setting-group">
       <div class="field-label">${isEn ? "DOWNLOAD FOLDERS" : "LOKASI UNDUHAN"}</div>
-      <div class="alert alert-info path-info">
-        <strong>${isEn ? "Android APK:" : "APK Android:"}</strong><br />
-        Video: <code>Download/Blackpage/video</code><br />
-        Audio: <code>Download/Blackpage/audio</code><br />
-        <small>${isEn ? "On Web, your browser lets you pick any save location." : "Untuk Web, browser bebas memilih lokasi simpan."}</small>
-      </div>
+      <button type="button" class="toggle-row" id="openDownloadLocBtn">
+        <div class="toggle-text">
+          <div class="theme-option-title">${isEn ? "Download Location" : "Lokasi Unduhan"}</div>
+          <div class="theme-option-sub">Video: <code>${escapeHtml(videoFolder)}</code></div>
+          <div class="theme-option-sub">Audio: <code>${escapeHtml(audioFolder)}</code></div>
+        </div>
+        <span class="tool-arrow" aria-hidden="true">→</span>
+      </button>
     </div>
 
     <div class="setting-group">
-      <div class="field-label">${isEn ? "GALLERY" : "GALERI"}</div>
+      <div class="field-label">AUTO-RETRY DOWNLOAD</div>
+      <button type="button" class="toggle-row" id="autoRetryToggleBtn" role="switch" aria-checked="${prefs.autoRetry !== false ? "true" : "false"}">
+        <div class="toggle-text">
+          <div class="theme-option-title">Auto-Retry Download</div>
+          <div class="theme-option-sub">${isEn ? "Retry automatically if download fails" : "Ulangi otomatis jika unduhan gagal"}</div>
+        </div>
+        <span class="toggle-switch ${prefs.autoRetry !== false ? "on" : ""}"><span class="toggle-knob"></span></span>
+      </button>
+
+      <button type="button" class="toggle-row" id="openMaxRetryBtn">
+        <div class="toggle-text">
+          <div class="theme-option-title">${isEn ? "MAX RETRIES" : "MAKS PERCOBAAN ULANG"}</div>
+          <div class="theme-option-sub">${escapeHtml(getMaxRetryLabel(prefs.maxRetry, isEn))}</div>
+        </div>
+        <span class="tag">${Number(prefs.maxRetry) || 3}X</span>
+      </button>
+    </div>
+
+    <div class="setting-group">
+      <div class="field-label">${isEn ? "GALLERY &amp; DATA" : "GALERI &amp; DATA"}</div>
       <button type="button" class="toggle-row" id="autoSaveGalBtn" role="switch" aria-checked="${prefs.autoSaveGallery ? "true" : "false"}">
         <div class="toggle-text">
           <div class="theme-option-title">${isEn ? "Auto-Save to Gallery" : "Simpan Otomatis ke Galeri"}</div>
@@ -1062,77 +1632,133 @@ function renderPenyimpananSettings() {
         <div class="stat-box"><strong>${kb} KB</strong><span>CACHE</span></div>
       </div>
 
-      <button type="button" class="btn" id="clearStorageGalBtn" ${items.length ? "" : "disabled"}>
-        ${isEn ? "Clear Gallery Cache" : "Bersihkan Cache Galeri"}
-      </button>
-    </div>
-  `;
-}
+      <div class="bp-storage-actions">
+        <button type="button" class="toggle-row" id="clearStorageGalBtn" ${items.length ? "" : "disabled"}>
+          <div class="toggle-text">
+            <div class="theme-option-title">${isEn ? "Clear Cache" : "Hapus Cache"}</div>
+            <div class="theme-option-sub">${isEn ? "Clear saved gallery history" : "Bersihkan riwayat cache galeri"}</div>
+          </div>
+          <span class="tag bp-tag-danger">${isEn ? "CLEAR" : "BERSIHKAN"}</span>
+        </button>
 
-function renderLanjutanSettings() {
-  const isEn = getLang() === "en";
-  const savedApi = localStorage.getItem(API_BASE_KEY) || "";
-  return `
-    <form id="advApiForm" class="settings-form">
-      <label class="field-label" for="advApiInput">${isEn ? "API Base URL (for APK)" : "API Base URL (opsional untuk APK)"}</label>
-      <input
-        id="advApiInput"
-        class="brutal-input"
-        type="url"
-        placeholder="${isEn ? "Leave empty for same-origin (web)" : "Kosongkan untuk same-origin (web)"}"
-        value="${escapeHtml(savedApi)}"
-      />
-      <div class="settings-actions">
-        <button type="submit" class="btn btn-primary">${isEn ? "Save" : "Simpan"}</button>
-        <button type="button" class="btn" id="pingApiBtn">${isEn ? "Test Ping" : "Tes Koneksi"}</button>
+        <button type="button" class="toggle-row" id="resetAllDataBtn">
+          <div class="toggle-text">
+            <div class="theme-option-title">${isEn ? "Delete All Data" : "Hapus Semua Data"}</div>
+            <div class="theme-option-sub">${isEn ? "Reset all settings, theme &amp; gallery" : "Reset semua pengaturan, tema &amp; galeri"}</div>
+          </div>
+          <span class="tag bp-tag-danger">RESET</span>
+        </button>
       </div>
-    </form>
-
-    <div id="advFeedback"></div>
-
-    <div class="setting-group" style="margin-top: 16px;">
-      <div class="field-label">${isEn ? "RESET" : "ATUR ULANG"}</div>
-      <button type="button" class="btn btn-success" id="resetAllBtn">
-        ${isEn ? "Reset All Settings & Data" : "Reset Semua Pengaturan & Data"}
-      </button>
     </div>
   `;
 }
+
+function renderBackupSettings() {
+  const isEn = getLang() === "en";
+  const items = loadGalleryItems();
+  return `
+    <div class="setting-group">
+      <div class="field-label">${isEn ? "DATA BACKUP" : "CADANGKAN DATA"}</div>
+      <div class="alert alert-info path-info" style="margin-bottom:10px;">
+        ${isEn
+      ? `Back up your ${items.length} saved Music &amp; Gallery items, custom titles, and app preferences to a JSON file.`
+      : `Simpan ${items.length} item Music &amp; Galeri, judul kustom, dan semua pengaturan aplikasi ke file JSON.`}
+      </div>
+      <div class="bp-storage-actions">
+        <button type="button" class="btn btn-primary" id="exportBackupBtn">
+          ${isEn ? "Export Backup (.json)" : "Ekspor Backup (.json)"}
+        </button>
+        <label class="btn" style="text-align:center;cursor:pointer;">
+          ${isEn ? "Import / Restore (.json)" : "Impor / Pulihkan (.json)"}
+          <input type="file" id="importBackupInput" accept="application/json,.json" hidden />
+        </label>
+      </div>
+    </div>
+
+    <div class="setting-group" style="margin-top:14px;">
+      <div class="field-label">${isEn ? "CONNECTION" : "KONEKSI SERVER"}</div>
+      <button type="button" class="btn" id="pingApiBtn">${isEn ? "Test Server Latency" : "Tes Kecepatan Server"}</button>
+    </div>
+
+    <div id="backupFeedback" style="margin-top:10px;"></div>
+  `;
+}
+
+const ABOUT_ICONS = {
+  version: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2.5"/></svg>`,
+  platform: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2"/><line x1="10" y1="18" x2="14" y2="18"/></svg>`,
+  about: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none"/></svg>`,
+  guide: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5Z"/><path d="M4 5.5v16"/></svg>`,
+  github: `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.18-3.37-1.18-.45-1.15-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.35 1.08 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.84c.85 0 1.71.11 2.51.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.85-2.34 4.7-4.57 4.95.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>`,
+};
 
 function renderTentangSettings() {
   const isEn = getLang() === "en";
+  const isApk = Boolean(window.Capacitor?.isNativePlatform?.());
+  const releaseUrl = `https://github.com/${GITHUB_REPO}/releases/latest`;
+  const repoUrl = `https://github.com/${GITHUB_REPO}`;
+
   return `
-    <div class="about-card">
-      <div class="about-head">
-        <img src="./logo.png" alt="Blackpage Logo" class="about-logo" />
-        <div>
-          <h3 style="margin:0;">BLACKPAGE</h3>
-          <p class="stage-desc" style="margin:2px 0 0;">v${APP_VERSION} · Manga Editorial · APK-Ready</p>
+    <div class="setting-group">
+      <div class="bp-about-list">
+        <div class="bp-about-row">
+          <div class="bp-about-left">
+            <span class="bp-about-icon">${ABOUT_ICONS.version}</span>
+            <div class="bp-about-text">
+              <strong>${isEn ? "VERSION" : "VERSI"}</strong>
+              <span>v${APP_VERSION}</span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm bp-about-cek-btn" id="checkUpdateBtn">${isEn ? "CHECK" : "CEK"}</button>
         </div>
+
+        <div id="updateStatusBox"></div>
+
+        <div class="bp-about-row">
+          <div class="bp-about-left">
+            <span class="bp-about-icon">${ABOUT_ICONS.platform}</span>
+            <div class="bp-about-text">
+              <strong>PLATFORM</strong>
+              <span>${isApk ? "Android (APK)" : (isEn ? "Website — Install the Android APK for full offline mode!" : "Website — Install aplikasi Android untuk fitur offline penuh!")}</span>
+            </div>
+          </div>
+          ${!isApk ? `<a class="tag bp-tag-danger" href="${escapeHtml(releaseUrl)}" target="_blank" rel="noopener">INSTALL</a>` : `<span class="tag">APK</span>`}
+        </div>
+
+        <button type="button" class="bp-about-row is-clickable" id="openAboutDescBtn">
+          <div class="bp-about-left">
+            <span class="bp-about-icon">${ABOUT_ICONS.about}</span>
+            <div class="bp-about-text">
+              <strong>${isEn ? "ABOUT BLACKPAGE" : "TENTANG BLACKPAGE"}</strong>
+            </div>
+          </div>
+          <span class="tag">${isEn ? "VIEW" : "LIHAT"}</span>
+        </button>
+
+        <button type="button" class="bp-about-row is-clickable" id="openAboutGuideBtn">
+          <div class="bp-about-left">
+            <span class="bp-about-icon">${ABOUT_ICONS.guide}</span>
+            <div class="bp-about-text">
+              <strong>${isEn ? "HOW TO USE" : "CARA PENGGUNAAN"}</strong>
+            </div>
+          </div>
+          <span class="tag">${isEn ? "VIEW" : "LIHAT"}</span>
+        </button>
       </div>
-      <p class="about-text">
-        ${isEn
-      ? "Lightweight multi-tool utility hub built with zero-dependency Node.js and vanilla ES modules."
-      : "Hub multi-tools ringan berbasis Node.js tanpa dependency eksternal dan vanilla ES modules."}
-      </p>
     </div>
 
-    <div class="setting-group" style="margin-top: 12px;">
-      <div class="field-label">${isEn ? "APP UPDATES" : "PEMBARUAN APLIKASI"}</div>
-      <div id="updateStatusBox"></div>
-      <div class="settings-actions">
-        <button type="button" class="btn btn-primary" id="checkUpdateBtn">${isEn ? "Check for Updates" : "Cek Update"}</button>
-        <a class="btn" href="https://github.com/${GITHUB_REPO}/releases" target="_blank" rel="noopener">GitHub Releases</a>
-      </div>
-    </div>
-
-    <div class="setting-group" style="margin-top: 12px;">
-      <div class="field-label">${isEn ? "QUICK GUIDE" : "PANDUAN CEPAT"}</div>
-      <div class="alert alert-info path-info" style="margin-bottom:0;">
-        1. ${isEn ? "Open TikTok Downloader, paste link, video auto-plays." : "Buka TikTok Downloader, tempel link, video otomatis diputar."}<br />
-        2. ${isEn ? "Hold caption text to select part of it, or tap Copy All." : "Tahan teks caption untuk pilih sebagian, atau klik Salin Semua."}<br />
-        3. ${isEn ? "Downloaded media appears in Gallery with VIDEO / MP3 filters." : "Media terunduh otomatis masuk Galeri dengan filter VIDEO / MP3."}
-      </div>
+    <div class="setting-group" style="margin-top:16px;">
+      <div class="field-label">${isEn ? "COMMUNITY" : "KOMUNITAS"}</div>
+      <a class="bp-about-row is-clickable" href="${escapeHtml(repoUrl)}" target="_blank" rel="noopener" style="text-decoration:none;">
+        <div class="bp-about-left">
+          <span class="bp-about-icon">${ABOUT_ICONS.github}</span>
+          <div class="bp-about-text">
+            <strong>GitHub — Ricardo169zzz</strong>
+            <span>${escapeHtml(repoUrl)}</span>
+          </div>
+        </div>
+        <span class="tool-arrow" aria-hidden="true">→</span>
+      </a>
     </div>
   `;
 }
@@ -1196,6 +1822,137 @@ function renderUmumSettings() {
   `;
 }
 
+function showLanguageRestartModal(nextLang, onDone) {
+  document.querySelector("#bpLangModal")?.remove();
+  const toEn = nextLang === "en";
+  const isUiEn = getLang() === "en";
+  const host = document.querySelector(".app-shell") || document.body;
+  const modal = document.createElement("div");
+  modal.id = "bpLangModal";
+  modal.className = "comic-modal-backdrop";
+  modal.innerHTML = `
+    <div class="comic-modal-card" role="dialog" aria-modal="true" aria-labelledby="bpLangTitle">
+      <div class="stage-head" style="margin-bottom:8px;">
+        <h3 id="bpLangTitle" style="margin:0;font-size:0.95rem;">${toEn ? "SWITCH TO ENGLISH" : "UBAH KE BAHASA INDONESIA"}</h3>
+        <span class="tag">${toEn ? "EN" : "ID"}</span>
+      </div>
+      <p class="stage-desc" style="margin:0 0 12px;line-height:1.45;">
+        ${toEn
+      ? "Restart the app to apply English across all menus &amp; pages."
+      : "Restart aplikasi agar Bahasa Indonesia diterapkan penuh di semua menu &amp; halaman."
+    }
+      </p>
+      <label class="comic-modal-check">
+        <input type="checkbox" id="langComicServerCheck" />
+        <span class="comic-check-box" aria-hidden="true"></span>
+        <span>${toEn
+      ? "Also switch Comic/Anime server to English (MangaDex EN)"
+      : "Ubah juga server Komik/Anime ke Bahasa Indonesia (Auto)"
+    }</span>
+      </label>
+      <div id="langModalActions" style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:14px;">
+        <button type="button" class="btn btn-primary" id="langRestartLater" style="transform-origin:left center;">${isUiEn ? "Done" : "Selesai"}</button>
+        <button type="button" class="btn btn-primary" id="langRestartNow" hidden>${isUiEn ? "Restart Now" : "Restart Sekarang"}</button>
+      </div>
+    </div>
+  `;
+
+  const actionsEl = modal.querySelector("#langModalActions");
+  const chkEl = modal.querySelector("#langComicServerCheck");
+  const laterBtn = modal.querySelector("#langRestartLater");
+  const nowBtn = modal.querySelector("#langRestartNow");
+  let hideNowTimer = null;
+
+  chkEl?.addEventListener("change", () => {
+    clearTimeout(hideNowTimer);
+    const checked = chkEl.checked;
+    const reduce = getPrefs().reduceMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const prevRect = !reduce ? laterBtn.getBoundingClientRect() : null;
+
+    if (checked) {
+      actionsEl.style.gridTemplateColumns = "1fr 1fr";
+      laterBtn.className = "btn";
+      laterBtn.textContent = isUiEn ? "Later" : "Nanti";
+      nowBtn.hidden = false;
+
+      if (!reduce && typeof laterBtn.animate === "function") {
+        const nextRect = laterBtn.getBoundingClientRect();
+        const sx = prevRect && nextRect.width ? prevRect.width / nextRect.width : 1;
+        laterBtn.animate(
+          [
+            { opacity: 0.72, transform: `scaleX(${sx})` },
+            { opacity: 1, transform: "scaleX(1)" },
+          ],
+          { duration: 240, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+        );
+        nowBtn.animate(
+          [
+            { opacity: 0, transform: "translate3d(16px, 0, 0) scale(0.94)" },
+            { opacity: 1, transform: "translate3d(0, 0, 0) scale(1)" },
+          ],
+          { duration: 240, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+        );
+      }
+      return;
+    }
+
+    const collapseToDone = () => {
+      const beforeRect = !reduce ? laterBtn.getBoundingClientRect() : null;
+      nowBtn.hidden = true;
+      actionsEl.style.gridTemplateColumns = "1fr";
+      laterBtn.className = "btn btn-primary";
+      laterBtn.textContent = isUiEn ? "Done" : "Selesai";
+
+      if (!reduce && beforeRect && typeof laterBtn.animate === "function") {
+        const afterRect = laterBtn.getBoundingClientRect();
+        const sx = afterRect.width ? beforeRect.width / afterRect.width : 1;
+        laterBtn.animate(
+          [
+            { opacity: 0.78, transform: `scaleX(${sx})` },
+            { opacity: 1, transform: "scaleX(1)" },
+          ],
+          { duration: 240, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+        );
+      }
+    };
+
+    if (!reduce && !nowBtn.hidden && typeof nowBtn.animate === "function") {
+      nowBtn.animate(
+        [
+          { opacity: 1, transform: "translate3d(0, 0, 0) scale(1)" },
+          { opacity: 0, transform: "translate3d(14px, 0, 0) scale(0.94)" },
+        ],
+        { duration: 160, easing: "cubic-bezier(0.4, 0, 1, 1)" }
+      );
+      hideNowTimer = setTimeout(collapseToDone, 150);
+    } else {
+      collapseToDone();
+    }
+  });
+
+  const applyChoice = () => {
+    localStorage.setItem(LANG_KEY, nextLang);
+    if (chkEl?.checked) {
+      localStorage.setItem("blackpage_comic_lang_v1", nextLang);
+      localStorage.setItem("blackpage_comic_server_v1", nextLang === "en" ? "mangadex" : "auto");
+    }
+  };
+
+  modal.querySelector("#langRestartLater")?.addEventListener("click", () => {
+    applyChoice();
+    modal.remove();
+    onDone?.();
+  });
+  modal.querySelector("#langRestartNow")?.addEventListener("click", () => {
+    applyChoice();
+    window.location.reload();
+  });
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.remove();
+  });
+  host.appendChild(modal);
+}
+
 function renderSettingDetail(sectionId, fromPopstate = false) {
   const section = SETTINGS_SECTIONS.find((s) => s.id === sectionId);
   if (!section) return renderSettings(fromPopstate);
@@ -1212,8 +1969,8 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
         ? renderTampilanSettings()
         : section.id === "penyimpanan"
           ? renderPenyimpananSettings()
-          : section.id === "lanjutan"
-            ? renderLanjutanSettings()
+          : section.id === "backup"
+            ? renderBackupSettings()
             : renderTentangSettings();
 
   stageEl.innerHTML = `
@@ -1231,16 +1988,37 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
   `;
   playPageEnter();
 
-  const themeOpts = stageEl.querySelector("#themeOptions");
-  if (themeOpts) {
-    themeOpts.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-set-theme]");
-      if (!btn) return;
-      const mode = btn.dataset.setTheme;
-      localStorage.setItem(THEME_KEY, mode);
-      applyTheme(mode);
+  const darkModeToggleBtn = stageEl.querySelector("#darkModeToggleBtn");
+  if (darkModeToggleBtn) {
+    darkModeToggleBtn.addEventListener("click", () => {
+      const cur = getThemeMode();
+      const sysDark = Boolean(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      const isCurrentlyDark = cur === "auto" ? sysDark : cur === "dark";
+      const next = isCurrentlyDark ? "light" : "dark";
+      localStorage.setItem(THEME_KEY, next);
+      applyTheme(next);
       renderSettingDetail("tampilan", true);
     });
+  }
+
+  const systemThemeToggleBtn = stageEl.querySelector("#systemThemeToggleBtn");
+  if (systemThemeToggleBtn) {
+    systemThemeToggleBtn.addEventListener("click", () => {
+      const cur = getThemeMode();
+      let next = "auto";
+      if (cur === "auto") {
+        const sysDark = Boolean(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        next = sysDark ? "dark" : "light";
+      }
+      localStorage.setItem(THEME_KEY, next);
+      applyTheme(next);
+      renderSettingDetail("tampilan", true);
+    });
+  }
+
+  const openBgBtn = stageEl.querySelector("#openBgEffectPageBtn");
+  if (openBgBtn) {
+    openBgBtn.addEventListener("click", () => renderBgEffectSettings());
   }
 
   const reduceMotionBtn = stageEl.querySelector("#reduceMotionBtn");
@@ -1255,9 +2033,200 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
   }
 
   if (section.id === "penyimpanan") {
+    const openLocBtn = stageEl.querySelector("#openDownloadLocBtn");
+    const autoRetryBtn = stageEl.querySelector("#autoRetryToggleBtn");
+    const openRetryBtn = stageEl.querySelector("#openMaxRetryBtn");
     const autoSaveBtn = stageEl.querySelector("#autoSaveGalBtn");
     const clearBtn = stageEl.querySelector("#clearStorageGalBtn");
-    autoSaveBtn.addEventListener("click", () => {
+    const resetAllBtn = stageEl.querySelector("#resetAllDataBtn");
+
+    openLocBtn?.addEventListener("click", () => {
+      if (document.querySelector("#bpDownloadLocModal")) return;
+      const isEn = getLang() === "en";
+      const prefs = getPrefs();
+      let activeKind = "video";
+      let draftVideo = prefs.videoFolder || "Download/Blackpage/video";
+      let draftAudio = prefs.audioFolder || "Download/Blackpage/audio";
+
+      const videoPresets = [
+        "Download/Blackpage/video",
+        "Movies/Blackpage",
+        "DCIM/Blackpage",
+        "Download",
+      ];
+      const audioPresets = [
+        "Download/Blackpage/audio",
+        "Music/Blackpage",
+      ];
+
+      const host = document.querySelector(".app-shell") || document.body;
+      const el = document.createElement("div");
+      el.id = "bpDownloadLocModal";
+      el.className = "bp-modal-backdrop";
+
+      const renderLocModal = () => {
+        const presets = activeKind === "video" ? videoPresets : audioPresets;
+        const curVal = activeKind === "video" ? draftVideo : draftAudio;
+        const isCustom = !presets.includes(curVal);
+        el.innerHTML = `
+          <div class="bp-modal-card bp-sp-modal-card">
+            <div class="bp-modal-head">
+              <span class="tag">${isEn ? "DOWNLOAD LOCATION" : "LOKASI UNDUHAN"}</span>
+              <button type="button" class="btn btn-sm" id="locCloseBtn">✕</button>
+            </div>
+
+            <div class="bp-loc-targets">
+              <button type="button" class="bp-loc-target ${activeKind === "video" ? "active" : ""}" data-loc-kind="video">
+                <strong>${isEn ? "Default Video Location" : "Lokasi Bawaan Video"}</strong>
+                <span>${escapeHtml(draftVideo)}</span>
+              </button>
+              <button type="button" class="bp-loc-target ${activeKind === "audio" ? "active" : ""}" data-loc-kind="audio">
+                <strong>${isEn ? "Default Audio Location" : "Lokasi Bawaan Audio"}</strong>
+                <span>${escapeHtml(draftAudio)}</span>
+              </button>
+            </div>
+
+            <div class="field-label" style="margin-top:12px;">${isEn ? "QUICK PRESETS" : "SARAN LOKASI"}</div>
+            <div class="bp-loc-presets">
+              ${presets
+            .map(
+              (p, i) => `
+                  <button type="button" class="bp-loc-preset-btn ${curVal === p ? "active" : ""}" data-loc-preset="${escapeHtml(p)}">
+                    <span>${i + 1}. ${escapeHtml(p)}</span>
+                    ${curVal === p ? `<span class="tag">${isEn ? "ACTIVE" : "AKTIF"}</span>` : ""}
+                  </button>
+                `
+            )
+            .join("")}
+              <button type="button" class="bp-loc-preset-btn ${isCustom ? "active" : ""}" id="locPickFolderBtn">
+                <span>${presets.length + 1}. ${isEn ? "Choose folder" : "Pilih folder"}</span>
+                ${isCustom ? `<span class="tag">${isEn ? "CUSTOM" : "KUSTOM"}</span>` : ""}
+              </button>
+            </div>
+
+            <div id="locCustomWrap" style="margin-top:8px;${isCustom ? "" : "display:none;"}">
+              <input type="text" class="brutal-input" id="locCustomInput" value="${escapeHtml(curVal)}" placeholder="Download/Blackpage/..." />
+            </div>
+
+            <div class="bp-loc-footer">
+              <button type="button" class="btn" id="locCancelBtn">${isEn ? "Cancel" : "Batal"}</button>
+              <button type="button" class="btn btn-primary" id="locSaveBtn">${isEn ? "Save" : "Simpan"}</button>
+            </div>
+          </div>
+        `;
+
+        el.querySelector("#locCloseBtn")?.addEventListener("click", () => el.remove());
+        el.querySelector("#locCancelBtn")?.addEventListener("click", () => el.remove());
+        el.querySelectorAll("[data-loc-kind]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            activeKind = btn.dataset.locKind;
+            renderLocModal();
+          });
+        });
+        el.querySelectorAll("[data-loc-preset]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            if (activeKind === "video") draftVideo = btn.dataset.locPreset;
+            else draftAudio = btn.dataset.locPreset;
+            renderLocModal();
+          });
+        });
+        el.querySelector("#locPickFolderBtn")?.addEventListener("click", async () => {
+          const wrap = el.querySelector("#locCustomWrap");
+          const inp = el.querySelector("#locCustomInput");
+          if (wrap) wrap.style.display = "block";
+          if (typeof window.showDirectoryPicker === "function") {
+            try {
+              const dirHandle = await window.showDirectoryPicker();
+              if (dirHandle?.name) {
+                if (activeKind === "video") draftVideo = dirHandle.name;
+                else draftAudio = dirHandle.name;
+                renderLocModal();
+                return;
+              }
+            } catch { }
+          }
+          inp?.focus();
+        });
+        el.querySelector("#locCustomInput")?.addEventListener("input", (ev) => {
+          const val = ev.target.value.trim();
+          if (activeKind === "video") draftVideo = val || "Download/Blackpage/video";
+          else draftAudio = val || "Download/Blackpage/audio";
+        });
+        el.querySelector("#locSaveBtn")?.addEventListener("click", () => {
+          const p = getPrefs();
+          p.videoFolder = (draftVideo || "Download/Blackpage/video").replace(/^\/+|\/+$/g, "");
+          p.audioFolder = (draftAudio || "Download/Blackpage/audio").replace(/^\/+|\/+$/g, "");
+          savePrefs(p);
+          el.remove();
+          renderSettingDetail("penyimpanan", true);
+        });
+      };
+
+      host.appendChild(el);
+      renderLocModal();
+      el.addEventListener("click", (e) => {
+        if (e.target === el) el.remove();
+      });
+    });
+
+    autoRetryBtn?.addEventListener("click", () => {
+      const p = getPrefs();
+      p.autoRetry = p.autoRetry === false ? true : false;
+      savePrefs(p);
+      renderSettingDetail("penyimpanan", true);
+    });
+
+    openRetryBtn?.addEventListener("click", () => {
+      if (document.querySelector("#bpMaxRetryModal")) return;
+      const isEn = getLang() === "en";
+      const cur = Number(getPrefs().maxRetry) || 3;
+      const opts = [
+        { val: 1, label: isEn ? "1. 1 (no retry)" : "1. 1 (tanpa ulang)" },
+        { val: 2, label: isEn ? "2. 2 attempts" : "2. 2 percobaan" },
+        { val: 3, label: isEn ? "3. 3 attempts" : "3. 3 percobaan" },
+        { val: 5, label: isEn ? "4. 5 attempts" : "4. 5 percobaan" },
+      ];
+      const host = document.querySelector(".app-shell") || document.body;
+      const el = document.createElement("div");
+      el.id = "bpMaxRetryModal";
+      el.className = "bp-modal-backdrop";
+      el.innerHTML = `
+        <div class="bp-modal-card">
+          <div class="bp-modal-head">
+            <span class="tag">${isEn ? "MAX RETRIES" : "MAKS PERCOBAAN ULANG"}</span>
+            <button type="button" class="btn btn-sm" id="retryCloseBtn">✕</button>
+          </div>
+          <div class="bp-loc-presets">
+            ${opts
+          .map(
+            (o) => `
+                <button type="button" class="bp-loc-preset-btn ${cur === o.val ? "active" : ""}" data-set-retry="${o.val}">
+                  <span>${escapeHtml(o.label)}</span>
+                  ${cur === o.val ? `<span class="tag">${isEn ? "ACTIVE" : "AKTIF"}</span>` : ""}
+                </button>
+              `
+          )
+          .join("")}
+          </div>
+        </div>
+      `;
+      host.appendChild(el);
+      el.querySelector("#retryCloseBtn")?.addEventListener("click", () => el.remove());
+      el.addEventListener("click", (e) => {
+        if (e.target === el) el.remove();
+      });
+      el.querySelectorAll("[data-set-retry]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const p = getPrefs();
+          p.maxRetry = Number(btn.dataset.setRetry);
+          savePrefs(p);
+          el.remove();
+          renderSettingDetail("penyimpanan", true);
+        });
+      });
+    });
+
+    autoSaveBtn?.addEventListener("click", () => {
       const prefs = getPrefs();
       prefs.autoSaveGallery = !prefs.autoSaveGallery;
       savePrefs(prefs);
@@ -1269,25 +2238,101 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
         renderSettingDetail("penyimpanan", true);
       });
     }
+    resetAllBtn?.addEventListener("click", () => {
+      localStorage.removeItem(TT_HISTORY_KEY);
+      localStorage.removeItem(PREFS_KEY);
+      localStorage.removeItem(THEME_KEY);
+      localStorage.removeItem(API_BASE_KEY);
+      applyTheme("auto");
+      applyMotionPref();
+      applyBgEffectPref();
+      renderSettingDetail("penyimpanan", true);
+    });
   }
 
-  if (section.id === "lanjutan") {
-    const form = stageEl.querySelector("#advApiForm");
-    const apiInput = stageEl.querySelector("#advApiInput");
+  if (section.id === "backup") {
+    const isEn = getLang() === "en";
+    const exportBtn = stageEl.querySelector("#exportBackupBtn");
+    const importInput = stageEl.querySelector("#importBackupInput");
     const pingBtn = stageEl.querySelector("#pingApiBtn");
-    const resetAllBtn = stageEl.querySelector("#resetAllBtn");
-    const feedback = stageEl.querySelector("#advFeedback");
+    const feedback = stageEl.querySelector("#backupFeedback");
 
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const val = apiInput.value.trim().replace(/\/+$/, "");
-      if (val) localStorage.setItem(API_BASE_KEY, val);
-      else localStorage.removeItem(API_BASE_KEY);
-      feedback.innerHTML = `<div class="alert alert-info">API URL tersimpan.</div>`;
-      checkHealth();
+    exportBtn?.addEventListener("click", async () => {
+      const payload = {
+        app: "Blackpage",
+        version: APP_VERSION,
+        exportedAt: new Date().toISOString(),
+        history: loadGalleryItems(),
+        prefs: getPrefs(),
+        theme: getThemeMode(),
+        lang: getLang(),
+      };
+      const jsonStr = JSON.stringify(payload, null, 2);
+      const filename = `blackpage-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      try {
+        const cap = window.Capacitor;
+        const fs = cap?.Plugins?.Filesystem;
+        if (cap?.isNativePlatform?.() && fs) {
+          await fs.mkdir({ path: "Download/Blackpage", directory: "EXTERNAL_STORAGE", recursive: true }).catch(() => { });
+          const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+          await fs.writeFile({
+            path: `Download/Blackpage/${filename}`,
+            data: b64,
+            directory: "EXTERNAL_STORAGE",
+            recursive: true,
+          });
+          feedback.innerHTML = `<div class="alert alert-info">${isEn ? "Saved to" : "Tersimpan di"} Download/Blackpage/${escapeHtml(filename)}</div>`;
+        } else {
+          const blob = new Blob([jsonStr], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+          feedback.innerHTML = `<div class="alert alert-info">${isEn ? "Backup file downloaded!" : "File backup berhasil diunduh!"}</div>`;
+        }
+      } catch (err) {
+        feedback.innerHTML = `<div class="alert alert-error">${escapeHtml(err?.message || "Gagal ekspor backup.")}</div>`;
+      }
     });
 
-    pingBtn.addEventListener("click", async () => {
+    importInput?.addEventListener("change", async () => {
+      const file = importInput.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!data || typeof data !== "object" || data.app !== "Blackpage") {
+          throw new Error(isEn ? "Invalid Blackpage backup file" : "File backup Blackpage tidak valid");
+        }
+        if (Array.isArray(data.history)) {
+          localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(data.history.slice(0, 30)));
+        }
+        if (data.prefs && typeof data.prefs === "object") {
+          savePrefs({ ...DEFAULT_PREFS, ...data.prefs });
+        }
+        if (typeof data.theme === "string") {
+          localStorage.setItem(THEME_KEY, data.theme);
+          applyTheme(data.theme);
+        }
+        if (typeof data.lang === "string") {
+          localStorage.setItem(LANG_KEY, data.lang);
+        }
+        applyMotionPref();
+        applyBgEffectPref();
+        musicPlayer.refreshTracks();
+        renderSettingDetail("backup", true);
+        const fb = stageEl.querySelector("#backupFeedback");
+        if (fb) fb.innerHTML = `<div class="alert alert-info">${isEn ? "Backup restored successfully!" : "Data & pengaturan berhasil dipulihkan!"}</div>`;
+      } catch (err) {
+        feedback.innerHTML = `<div class="alert alert-error">${escapeHtml(err?.message || "Gagal membaca file backup.")}</div>`;
+      }
+    });
+
+    pingBtn?.addEventListener("click", async () => {
       const t0 = performance.now();
       try {
         const res = await fetch(`${getApiBase()}/api/health`);
@@ -1298,37 +2343,71 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
         feedback.innerHTML = `<div class="alert alert-error">OFFLINE · ${escapeHtml(err.message || "Gagal")}</div>`;
       }
     });
-
-    resetAllBtn.addEventListener("click", () => {
-      localStorage.removeItem(API_BASE_KEY);
-      localStorage.removeItem(TT_HISTORY_KEY);
-      localStorage.removeItem(THEME_KEY);
-      localStorage.removeItem(LANG_KEY);
-      localStorage.removeItem(PREFS_KEY);
-      applyTheme("auto");
-      applyMotionPref();
-      syncWakeLock();
-      checkHealth();
-      renderSettingDetail("lanjutan", true);
-    });
   }
 
   if (section.id === "tentang") {
+    const isEn = getLang() === "en";
     const checkBtn = stageEl.querySelector("#checkUpdateBtn");
     const box = stageEl.querySelector("#updateStatusBox");
+    const aboutDescBtn = stageEl.querySelector("#openAboutDescBtn");
+    const aboutGuideBtn = stageEl.querySelector("#openAboutGuideBtn");
+
+    const showInfoModal = (tagText, titleText, bodyHtml) => {
+      if (document.querySelector("#bpAboutInfoModal")) return;
+      const host = document.querySelector(".app-shell") || document.body;
+      const el = document.createElement("div");
+      el.id = "bpAboutInfoModal";
+      el.className = "bp-modal-backdrop";
+      el.innerHTML = `
+        <div class="bp-modal-card">
+          <div class="bp-modal-head">
+            <span class="tag">${escapeHtml(tagText)}</span>
+            <button type="button" class="btn btn-sm" id="aboutModalCloseBtn">✕</button>
+          </div>
+          <h3 class="bp-modal-title">${escapeHtml(titleText)}</h3>
+          <div class="bp-modal-desc" style="margin-bottom:0;">${bodyHtml}</div>
+        </div>
+      `;
+      host.appendChild(el);
+      el.querySelector("#aboutModalCloseBtn")?.addEventListener("click", () => el.remove());
+      el.addEventListener("click", (e) => {
+        if (e.target === el) el.remove();
+      });
+    };
+
+    aboutDescBtn?.addEventListener("click", () => {
+      showInfoModal(
+        isEn ? "ABOUT BLACKPAGE" : "TENTANG BLACKPAGE",
+        "Blackpage",
+        isEn
+          ? "Blackpage is a media downloader and versatile multi-tool utility, made with love by <strong>Ricardo</strong>."
+          : "Blackpage adalah pengunduh media dan berbagai tools serbaguna, dibuat dengan penuh cinta oleh <strong>Ricardo</strong>."
+      );
+    });
+
+    aboutGuideBtn?.addEventListener("click", () => {
+      showInfoModal(
+        isEn ? "HOW TO USE" : "CARA PENGGUNAAN",
+        isEn ? "Quick Guide" : "Panduan Singkat",
+        isEn
+          ? "1. Paste any supported link on <strong>Home</strong> and tap Process.<br/>2. Search &amp; download Spotify songs in the <strong>Music</strong> tab for offline &amp; background play.<br/>3. View downloaded photos &amp; videos in <strong>Gallery</strong>.<br/>4. Read manga/manhwa via <strong>Baca Komik</strong> and customize theme or background in <strong>Settings</strong>."
+          : "1. Tempel link media di tab <strong>Utama</strong> lalu tekan Proses.<br/>2. Cari &amp; unduh lagu Spotify di tab <strong>Music</strong> untuk diputar offline dan di latar belakang.<br/>3. Lihat foto &amp; video hasil unduhan di tab <strong>Galeri</strong>.<br/>4. Baca manga/manhwa di <strong>Baca Komik</strong> dan atur tema/latar di <strong>Setting</strong>."
+      );
+    });
+
     const renderUpdateState = (info) => {
       if (!info) return;
       if (info.hasUpdate) {
         box.innerHTML = `<div class="alert alert-info"><strong>Update tersedia: v${escapeHtml(info.latest)}</strong> (saat ini v${APP_VERSION}). <a href="${escapeHtml(info.url)}" target="_blank" rel="noopener">Unduh APK terbaru</a></div>`;
       } else {
-        box.innerHTML = `<div class="alert alert-info">Aplikasi sudah versi terbaru (v${APP_VERSION}).</div>`;
+        box.innerHTML = `<div class="alert alert-info">${isEn ? `App is up to date (v${APP_VERSION}).` : `Aplikasi sudah versi terbaru (v${APP_VERSION}).`}</div>`;
       }
     };
     if (latestUpdateInfo) renderUpdateState(latestUpdateInfo);
     checkBtn?.addEventListener("click", async () => {
       checkBtn.disabled = true;
-      checkBtn.textContent = "Mengecek...";
-      box.innerHTML = `<div class="alert alert-info">Mengecek versi terbaru di GitHub...</div>`;
+      checkBtn.textContent = "...";
+      box.innerHTML = `<div class="alert alert-info">${isEn ? "Checking latest version..." : "Mengecek versi terbaru di GitHub..."}</div>`;
       try {
         const info = await checkAppUpdate();
         renderUpdateState(info);
@@ -1336,7 +2415,7 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
         box.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message || "Gagal mengecek update.")}</div>`;
       } finally {
         checkBtn.disabled = false;
-        checkBtn.textContent = getLang() === "en" ? "Check for Updates" : "Cek Update";
+        checkBtn.textContent = isEn ? "CHECK" : "CEK";
       }
     });
   }
@@ -1363,8 +2442,11 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
     langRow.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-set-lang]");
       if (!btn) return;
-      localStorage.setItem(LANG_KEY, btn.dataset.setLang);
-      renderSettingDetail("umum", true);
+      const nextLang = btn.dataset.setLang;
+      langRow.hidden = true;
+      langSelectBtn.setAttribute("aria-expanded", "false");
+      if (nextLang === getLang()) return;
+      showLanguageRestartModal(nextLang, () => renderSettingDetail("umum", true));
     });
 
     togglesEl.addEventListener("click", (e) => {
@@ -1406,16 +2488,268 @@ function mountTool(id, prefillUrl = "", fromPopstate = false) {
   }
 }
 
+function formatAudioTime(sec) {
+  if (!Number.isFinite(sec) || sec < 0) return "00:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+const PLAY_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg>`;
+const PAUSE_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+const VOL_ON_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+const VOL_OFF_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`;
+
+function upgradeAudioPlayer(audioEl) {
+  if (!audioEl || audioEl.dataset.bpAudioReady || !audioEl.parentNode) return;
+  audioEl.dataset.bpAudioReady = "1";
+  audioEl.removeAttribute("controls");
+  audioEl.style.display = "none";
+
+  const player = document.createElement("div");
+  player.className = "bp-audio-player";
+  player.innerHTML = `
+    <button type="button" class="bp-audio-play" aria-label="Putar / Jeda">${PLAY_ICON}</button>
+    <div class="bp-audio-mid">
+      <input type="range" class="bp-audio-seek" min="0" max="1000" value="0" aria-label="Posisi audio" />
+      <div class="bp-audio-time">
+        <span class="bp-audio-cur">00:00</span>
+        <span class="bp-audio-dur">00:00</span>
+      </div>
+    </div>
+    <button type="button" class="bp-audio-mute" aria-label="Bisukan">${VOL_ON_ICON}</button>
+  `;
+
+  audioEl.parentNode.insertBefore(player, audioEl);
+  player.appendChild(audioEl);
+
+  const playBtn = player.querySelector(".bp-audio-play");
+  const seekEl = player.querySelector(".bp-audio-seek");
+  const curEl = player.querySelector(".bp-audio-cur");
+  const durEl = player.querySelector(".bp-audio-dur");
+  const muteBtn = player.querySelector(".bp-audio-mute");
+
+  let isSeeking = false;
+
+  const syncPlay = () => {
+    const playing = !audioEl.paused && !audioEl.ended;
+    player.classList.toggle("is-playing", playing);
+    playBtn.innerHTML = playing ? PAUSE_ICON : PLAY_ICON;
+  };
+
+  const syncTime = () => {
+    const dur = Number.isFinite(audioEl.duration) ? audioEl.duration : 0;
+    const cur = Number.isFinite(audioEl.currentTime) ? audioEl.currentTime : 0;
+    durEl.textContent = formatAudioTime(dur);
+    if (!isSeeking) {
+      curEl.textContent = formatAudioTime(cur);
+      const pct = dur > 0 ? Math.round((cur / dur) * 1000) : 0;
+      seekEl.value = String(pct);
+      seekEl.style.setProperty("--seek-pct", `${(pct / 10).toFixed(1)}%`);
+    }
+  };
+
+  playBtn.addEventListener("click", () => {
+    if (audioEl.paused) audioEl.play().catch(() => { });
+    else audioEl.pause();
+  });
+
+  muteBtn.addEventListener("click", () => {
+    audioEl.muted = !audioEl.muted;
+    muteBtn.innerHTML = audioEl.muted ? VOL_OFF_ICON : VOL_ON_ICON;
+  });
+
+  seekEl.addEventListener("input", () => {
+    isSeeking = true;
+    const pct = Number(seekEl.value) / 1000;
+    seekEl.style.setProperty("--seek-pct", `${(pct * 100).toFixed(1)}%`);
+    if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+      curEl.textContent = formatAudioTime(pct * audioEl.duration);
+    }
+  });
+
+  seekEl.addEventListener("change", () => {
+    const pct = Number(seekEl.value) / 1000;
+    if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+      audioEl.currentTime = pct * audioEl.duration;
+    }
+    isSeeking = false;
+  });
+
+  audioEl.addEventListener("play", syncPlay);
+  audioEl.addEventListener("pause", syncPlay);
+  audioEl.addEventListener("ended", syncPlay);
+  audioEl.addEventListener("loadedmetadata", syncTime);
+  audioEl.addEventListener("durationchange", syncTime);
+  audioEl.addEventListener("timeupdate", syncTime);
+
+  syncPlay();
+  syncTime();
+}
+
+const FS_ICON = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+
+function upgradeVideoPlayer(videoEl) {
+  if (!videoEl || videoEl.dataset.bpVideoReady || !videoEl.parentNode) return;
+  videoEl.dataset.bpVideoReady = "1";
+  videoEl.removeAttribute("controls");
+  videoEl.removeAttribute("muted");
+  videoEl.muted = false;
+
+  const wrap = document.createElement("div");
+  wrap.className = "bp-video-player";
+  videoEl.parentNode.insertBefore(wrap, videoEl);
+  wrap.appendChild(videoEl);
+
+  const centerBtn = document.createElement("button");
+  centerBtn.type = "button";
+  centerBtn.className = "bp-vid-center";
+  centerBtn.setAttribute("aria-label", "Putar video");
+  centerBtn.innerHTML = PLAY_ICON;
+
+  const bar = document.createElement("div");
+  bar.className = "bp-vid-bar";
+  bar.innerHTML = `
+    <button type="button" class="bp-audio-play bp-vid-play" aria-label="Putar / Jeda">${PLAY_ICON}</button>
+    <div class="bp-audio-mid">
+      <input type="range" class="bp-audio-seek bp-vid-seek" min="0" max="1000" value="0" aria-label="Posisi video" />
+      <div class="bp-audio-time">
+        <span class="bp-vid-cur">00:00</span>
+        <span class="bp-vid-dur">00:00</span>
+      </div>
+    </div>
+    <button type="button" class="bp-audio-mute bp-vid-mute" aria-label="Bisukan">${VOL_ON_ICON}</button>
+    <button type="button" class="bp-audio-mute bp-vid-fs" aria-label="Layar penuh">${FS_ICON}</button>
+  `;
+  wrap.appendChild(centerBtn);
+  wrap.appendChild(bar);
+
+  const playBtn = bar.querySelector(".bp-vid-play");
+  const seekEl = bar.querySelector(".bp-vid-seek");
+  const curEl = bar.querySelector(".bp-vid-cur");
+  const durEl = bar.querySelector(".bp-vid-dur");
+  const muteBtn = bar.querySelector(".bp-vid-mute");
+  const fsBtn = bar.querySelector(".bp-vid-fs");
+
+  let isSeeking = false;
+
+  const syncPlay = () => {
+    const playing = !videoEl.paused && !videoEl.ended;
+    wrap.classList.toggle("is-playing", playing);
+    playBtn.innerHTML = playing ? PAUSE_ICON : PLAY_ICON;
+    centerBtn.hidden = playing;
+  };
+
+  const syncMute = () => {
+    muteBtn.innerHTML = videoEl.muted ? VOL_OFF_ICON : VOL_ON_ICON;
+  };
+
+  const syncTime = () => {
+    const dur = Number.isFinite(videoEl.duration) ? videoEl.duration : 0;
+    const cur = Number.isFinite(videoEl.currentTime) ? videoEl.currentTime : 0;
+    durEl.textContent = formatAudioTime(dur);
+    if (!isSeeking) {
+      curEl.textContent = formatAudioTime(cur);
+      const pct = dur > 0 ? Math.round((cur / dur) * 1000) : 0;
+      seekEl.value = String(pct);
+      seekEl.style.setProperty("--seek-pct", `${(pct / 10).toFixed(1)}%`);
+    }
+  };
+
+  const togglePlay = () => {
+    if (videoEl.paused) {
+      videoEl.muted = false;
+      syncMute();
+      videoEl.play().catch(() => {
+        videoEl.muted = true;
+        syncMute();
+        videoEl.play().catch(() => { });
+      });
+    } else {
+      videoEl.pause();
+    }
+  };
+
+  videoEl.addEventListener("click", togglePlay);
+  centerBtn.addEventListener("click", togglePlay);
+  playBtn.addEventListener("click", togglePlay);
+
+  muteBtn.addEventListener("click", () => {
+    videoEl.muted = !videoEl.muted;
+    syncMute();
+  });
+
+  fsBtn.addEventListener("click", () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => { });
+    } else if (wrap.requestFullscreen) {
+      wrap.requestFullscreen().catch(() => videoEl.webkitEnterFullscreen?.());
+    } else {
+      videoEl.webkitEnterFullscreen?.();
+    }
+  });
+
+  seekEl.addEventListener("input", () => {
+    isSeeking = true;
+    const pct = Number(seekEl.value) / 1000;
+    seekEl.style.setProperty("--seek-pct", `${(pct * 100).toFixed(1)}%`);
+    if (Number.isFinite(videoEl.duration) && videoEl.duration > 0) {
+      curEl.textContent = formatAudioTime(pct * videoEl.duration);
+    }
+  });
+
+  seekEl.addEventListener("change", () => {
+    const pct = Number(seekEl.value) / 1000;
+    if (Number.isFinite(videoEl.duration) && videoEl.duration > 0) {
+      videoEl.currentTime = pct * videoEl.duration;
+    }
+    isSeeking = false;
+  });
+
+  videoEl.addEventListener("play", syncPlay);
+  videoEl.addEventListener("pause", syncPlay);
+  videoEl.addEventListener("ended", syncPlay);
+  videoEl.addEventListener("volumechange", syncMute);
+  videoEl.addEventListener("loadedmetadata", syncTime);
+  videoEl.addEventListener("durationchange", syncTime);
+  videoEl.addEventListener("timeupdate", syncTime);
+
+  syncPlay();
+  syncMute();
+  syncTime();
+
+  if (videoEl.autoplay) {
+    videoEl.play().catch(() => {
+      videoEl.muted = true;
+      syncMute();
+      videoEl.play().catch(() => { });
+    });
+  }
+}
+
+const audioMo = new MutationObserver(() => {
+  stageEl.querySelectorAll("audio.audio-preview:not([data-bp-audio-ready])").forEach(upgradeAudioPlayer);
+  stageEl.querySelectorAll("video.video-preview:not([data-bp-video-ready])").forEach(upgradeVideoPlayer);
+});
+audioMo.observe(stageEl, { childList: true, subtree: true });
+
 function navigate(page, fromPopstate = false) {
-  document.querySelectorAll(".comic-float-back, .comic-as-float").forEach((n) => n.remove());
+  document.querySelectorAll(".comic-float-back, .comic-as-float, .comic-top-float-back").forEach((n) => n.remove());
   if (page !== "comic") comicController = null;
+  const ws = stageEl.closest(".workspace");
+  if (ws && ws.scrollTop > 0) {
+    const reduce = getPrefs().reduceMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    ws.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  }
   if (page === "home") renderHome(fromPopstate);
   else if (page === "tools") renderToolsPage(fromPopstate);
+  else if (page === "music") renderMusicPage(fromPopstate);
   else if (page === "gallery") renderGallery(fromPopstate);
   else if (page === "settings") renderSettings(fromPopstate);
   else if (page === "comic") mountComicPage(fromPopstate);
   else if (page.startsWith("tool:")) mountTool(page.slice(5), "", fromPopstate);
   else if (page.startsWith("gallery:")) renderGalleryDetail(Number(page.slice(8)), fromPopstate);
+  else if (page === "settings:tampilan:bg") renderBgEffectSettings(fromPopstate);
   else if (page.startsWith("settings:")) renderSettingDetail(page.slice(9), fromPopstate);
   else renderHome(fromPopstate);
 }
@@ -1423,7 +2757,7 @@ function navigate(page, fromPopstate = false) {
 window.addEventListener("popstate", (e) => {
   const nextPage = e.state?.page || "home";
   if (nextPage === "comic" && activePage === "comic" && comicController) {
-    document.querySelectorAll(".comic-float-back, .comic-as-float").forEach((n) => n.remove());
+    document.querySelectorAll(".comic-float-back, .comic-as-float, .comic-top-float-back").forEach((n) => n.remove());
     comicController.syncView(e.state?.comicView || "search");
     playPageEnter();
     return;
@@ -1446,8 +2780,243 @@ function showExitToast() {
   exitToastTimer = setTimeout(() => el.remove(), 2000);
 }
 
+function showMusicExitWarningModal() {
+  if (document.querySelector("#bpMusicExitModal")) return;
+  const isEn = getLang() === "en";
+  const host = document.querySelector(".app-shell") || document.body;
+  const el = document.createElement("div");
+  el.id = "bpMusicExitModal";
+  el.className = "bp-modal-backdrop";
+  el.innerHTML = `
+    <div class="bp-modal-card">
+      <div class="bp-modal-head">
+        <span class="tag">${isEn ? "MUSIC WARNING" : "PERINGATAN MUSIK"}</span>
+        <button type="button" class="btn btn-sm" id="musicExitCancelBtn">✕</button>
+      </div>
+      <h3 class="bp-modal-title">${isEn ? "Music Is Still Playing!" : "Lagu Masih Diputar!"}</h3>
+      <p class="bp-modal-desc">${isEn ? "If you exit now without enabling <strong>Notifications &amp; Background Play</strong>, playback will stop." : "Kalau kamu keluar dari aplikasi sekarang tanpa mengizinkan <strong>Notifikasi &amp; Background Play</strong>, lagu akan otomatis berhenti."}</p>
+      <div class="bp-modal-actions">
+        <button type="button" class="btn btn-primary" id="musicExitAllowBtn">${isEn ? "Allow &amp; Keep Playing" : "Izinkan &amp; Tetap Putar"}</button>
+        <button type="button" class="btn btn-danger" id="musicExitStopBtn">${isEn ? "Exit &amp; Stop Music" : "Keluar &amp; Matikan Lagu"}</button>
+      </div>
+    </div>
+  `;
+  host.appendChild(el);
+  el.querySelector("#musicExitCancelBtn")?.addEventListener("click", () => el.remove());
+  el.querySelector("#musicExitAllowBtn")?.addEventListener("click", async () => {
+    await musicPlayer.requestBackgroundPermission();
+    el.remove();
+    if (musicPlayer.hasBackgroundPermission()) {
+      window.BlackpageNative?.moveToBackground?.();
+    }
+  });
+  el.querySelector("#musicExitStopBtn")?.addEventListener("click", () => {
+    musicPlayer.stop();
+    el.remove();
+    window.Capacitor?.Plugins?.App?.exitApp?.();
+  });
+}
+
+function openGalleryFullscreen(idx) {
+  const items = loadGalleryItems();
+  const initialItem = items[idx];
+  if (!initialItem) return;
+  if (initialItem.mediaType === "audio") {
+    renderGalleryDetail(idx);
+    return;
+  }
+  document.querySelector("#bpGalleryFullscreen")?.remove();
+
+  const mediaEntries = items
+    .map((it, origIdx) => ({ item: it, origIdx }))
+    .filter(({ item }) => item.mediaType !== "audio");
+  let pos = Math.max(0, mediaEntries.findIndex((e) => e.origIdx === idx));
+
+  const apiBase = getApiBase();
+  const isEn = getLang() === "en";
+  const host = document.querySelector(".app-shell") || document.body;
+  const fsEl = document.createElement("div");
+  fsEl.id = "bpGalleryFullscreen";
+  fsEl.className = "bp-gal-fs";
+  host.appendChild(fsEl);
+
+  const renderSlide = (slideDir = 0) => {
+    const curVideo = fsEl.querySelector("video");
+    if (curVideo) curVideo.pause();
+
+    const entry = mediaEntries[pos];
+    if (!entry) {
+      fsEl.remove();
+      return;
+    }
+    const { item, origIdx } = entry;
+    const isImage = item.mediaType === "image";
+    const mediaSrc = item.mediaUrl
+      ? `${apiBase}/api/media?${new URLSearchParams({ url: item.mediaUrl }).toString()}`
+      : "";
+    const thumbSrc = item.thumbnail
+      ? `${apiBase}/api/media?${new URLSearchParams({ url: item.thumbnail }).toString()}`
+      : "";
+
+    const mediaHtml = isImage
+      ? `<img class="bp-gal-fs-media" id="galFsMedia" src="${escapeHtml(mediaSrc || thumbSrc)}" alt="Foto" />`
+      : `<video class="video-preview bp-gal-fs-media" id="galFsMedia" src="${escapeHtml(mediaSrc)}" ${thumbSrc ? `poster="${escapeHtml(thumbSrc)}"` : ""} autoplay playsinline preload="auto"></video>`;
+
+    fsEl.innerHTML = `
+      <div class="bp-gal-fs-top">
+        <button type="button" class="bp-gal-fs-btn" id="galFsCloseBtn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          <span>${isEn ? "Back" : "Tutup"}</span>
+        </button>
+        <div class="bp-gal-fs-meta">
+          ${mediaEntries.length > 1 ? `<span class="bp-gal-fs-count">${pos + 1}/${mediaEntries.length}</span>` : ""}
+          <span class="bp-gal-fs-tag" id="galFsOfflineTag" hidden>OFFLINE</span>
+          <span class="bp-gal-fs-tag">${isImage ? (isEn ? "PHOTO" : "FOTO") : "VIDEO"}</span>
+          <button type="button" class="bp-gal-fs-btn is-icon" id="galFsInfoBtn" aria-label="Info">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="bp-gal-fs-stage" id="galFsStage">${mediaHtml}</div>
+      ${mediaEntries.length > 1
+        ? `<button type="button" class="bp-gal-fs-nav prev" id="galFsPrevBtn" aria-label="Previous">‹</button>
+           <button type="button" class="bp-gal-fs-nav next" id="galFsNextBtn" aria-label="Next">›</button>`
+        : ""}
+      <div class="bp-gal-fs-sheet" id="galFsSheet" hidden>
+        <div class="caption-head" style="margin-bottom:6px;">
+          <strong>${escapeHtml(item.author || "Media")}</strong>
+          <button type="button" class="btn btn-sm" id="galFsSheetClose">✕</button>
+        </div>
+        ${item.title ? `<p class="result-caption" style="margin:0 0 10px;">${escapeHtml(item.title)}</p>` : ""}
+        <div id="galFsFeedback"></div>
+        <div class="dl-list">
+          <button type="button" class="btn btn-success" id="galFsDlBtn">${isEn ? "Download Again" : "Unduh Lagi"}</button>
+          <button type="button" class="btn" id="galFsDelBtn">${isEn ? "Delete from Gallery" : "Hapus dari Galeri"}</button>
+        </div>
+      </div>
+    `;
+
+    const stage = fsEl.querySelector("#galFsStage");
+    if (slideDir && stage?.animate) {
+      stage.animate(
+        [
+          { opacity: 0.35, transform: `translate3d(${slideDir * 36}px, 0, 0)` },
+          { opacity: 1, transform: "translate3d(0, 0, 0)" },
+        ],
+        { duration: 210, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+      );
+    }
+
+    const mediaEl = fsEl.querySelector("#galFsMedia");
+    const offlineTag = fsEl.querySelector("#galFsOfflineTag");
+    const sheet = fsEl.querySelector("#galFsSheet");
+    const feedbackEl = fsEl.querySelector("#galFsFeedback");
+
+    if (!isImage && mediaEl) {
+      upgradeVideoPlayer(mediaEl);
+      mediaEl.addEventListener("play", () => musicPlayer.pause());
+      mediaEl.play?.().catch(() => {});
+    }
+
+    resolveOfflineMediaSrc(item).then((localSrc) => {
+      if (!localSrc || !fsEl.isConnected || !mediaEl) return;
+      if (offlineTag) offlineTag.hidden = false;
+      mediaEl.src = localSrc;
+      mediaEl.load?.();
+      if (!isImage) mediaEl.play?.().catch(() => {});
+    });
+
+    const goNext = () => {
+      if (mediaEntries.length < 2) return;
+      pos = (pos + 1) % mediaEntries.length;
+      renderSlide(1);
+    };
+    const goPrev = () => {
+      if (mediaEntries.length < 2) return;
+      pos = (pos - 1 + mediaEntries.length) % mediaEntries.length;
+      renderSlide(-1);
+    };
+
+    if (stage && mediaEntries.length > 1) {
+      let startX = 0;
+      let startY = 0;
+      let tracking = false;
+      stage.addEventListener("pointerdown", (e) => {
+        if (e.target.closest(".bp-video-bar, button, input")) return;
+        startX = e.clientX;
+        startY = e.clientY;
+        tracking = true;
+      });
+      stage.addEventListener("pointerup", (e) => {
+        if (!tracking) return;
+        tracking = false;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+          if (dx < 0) goNext();
+          else goPrev();
+        }
+      });
+      stage.addEventListener("pointercancel", () => {
+        tracking = false;
+      });
+    }
+
+    fsEl.querySelector("#galFsPrevBtn")?.addEventListener("click", goPrev);
+    fsEl.querySelector("#galFsNextBtn")?.addEventListener("click", goNext);
+    fsEl.querySelector("#galFsCloseBtn")?.addEventListener("click", () => {
+      fsEl.querySelector("video")?.pause();
+      fsEl.remove();
+    });
+    fsEl.querySelector("#galFsInfoBtn")?.addEventListener("click", () => {
+      if (sheet) sheet.hidden = !sheet.hidden;
+    });
+    fsEl.querySelector("#galFsSheetClose")?.addEventListener("click", () => {
+      if (sheet) sheet.hidden = true;
+    });
+
+    const dlBtn = fsEl.querySelector("#galFsDlBtn");
+    dlBtn?.addEventListener("click", async () => {
+      const orig = dlBtn.textContent;
+      dlBtn.disabled = true;
+      dlBtn.textContent = "...";
+      try {
+        const res = await downloadMediaFile({
+          API_BASE: apiBase,
+          remoteUrl: item.mediaUrl,
+          mediaType: isImage ? "image" : "video",
+          filename: item.filename || `blackpage_${Date.now()}.${isImage ? "jpg" : "mp4"}`,
+          onProgress: (p) => {
+            if (typeof p.percent === "number") dlBtn.textContent = `${p.percent}%`;
+          },
+        });
+        if (feedbackEl) {
+          feedbackEl.innerHTML = `<div class="alert alert-info">${res.native ? `Tersimpan di ${escapeHtml(res.path)}!` : "Download dimulai!"}</div>`;
+        }
+      } catch (err) {
+        if (feedbackEl) {
+          feedbackEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err?.message || "Gagal mengunduh.")}</div>`;
+        }
+      } finally {
+        dlBtn.disabled = false;
+        dlBtn.textContent = orig;
+      }
+    });
+
+    fsEl.querySelector("#galFsDelBtn")?.addEventListener("click", () => {
+      fsEl.querySelector("video")?.pause();
+      const updated = loadGalleryItems().filter((_, i) => i !== origIdx);
+      localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(updated));
+      fsEl.remove();
+      renderGallery();
+    });
+  };
+
+  renderSlide(0);
+}
+
 window.Capacitor?.Plugins?.App?.addListener?.("backButton", () => {
-  const modal = document.querySelector("#bpStickerLightbox, #comicAsTipModal");
+  const modal = document.querySelector("#bpStickerLightbox, #comicAsTipModal, #pinLightbox, #bpLangModal, #bpMusicExitModal, #bpMusicRenameModal, #bpSpotifyModal, #bpUpdateModal, #bpDownloadLocModal, #bpMaxRetryModal, #bpAboutInfoModal, #bpGalleryFullscreen");
   if (modal) {
     modal.remove();
     return;
@@ -1455,6 +3024,17 @@ window.Capacitor?.Plugins?.App?.addListener?.("backButton", () => {
   if (activePage !== "home") {
     history.back();
     return;
+  }
+  const snap = musicPlayer.getSnapshot();
+  if (snap.isPlaying) {
+    if (!musicPlayer.hasBackgroundPermission()) {
+      showMusicExitWarningModal();
+      return;
+    }
+    if (window.BlackpageNative?.moveToBackground) {
+      window.BlackpageNative.moveToBackground();
+      return;
+    }
   }
   const now = Date.now();
   if (now - lastBackPressAt < 2000) {
@@ -1479,7 +3059,7 @@ stageEl.addEventListener("click", (e) => {
   }
   const openGal = e.target.closest("[data-open-gallery]");
   if (openGal) {
-    renderGalleryDetail(Number(openGal.dataset.openGallery));
+    openGalleryFullscreen(Number(openGal.dataset.openGallery));
     return;
   }
   const openSet = e.target.closest("[data-open-setting]");
@@ -1510,14 +3090,62 @@ function compareSemver(a, b) {
   return 0;
 }
 
+let hasShownUpdateModal = false;
+
+function showUpdatePopupModal(info) {
+  if (!info?.hasUpdate || hasShownUpdateModal || document.querySelector("#bpUpdateModal")) return;
+  hasShownUpdateModal = true;
+  const isEn = getLang() === "en";
+  const host = document.querySelector(".app-shell") || document.body;
+  const el = document.createElement("div");
+  el.id = "bpUpdateModal";
+  el.className = "bp-modal-backdrop";
+  el.innerHTML = `
+    <div class="bp-modal-card">
+      <div class="bp-modal-head">
+        <span class="tag">${isEn ? "UPDATE AVAILABLE" : "UPDATE TERSEDIA"}</span>
+        <button type="button" class="btn btn-sm" id="bpUpdateCloseBtn">✕</button>
+      </div>
+      <h3 class="bp-modal-title">${isEn ? `Blackpage v${escapeHtml(info.latest)} Is Out!` : `Blackpage v${escapeHtml(info.latest)} Sudah Rilis!`}</h3>
+      <p class="bp-modal-desc">${isEn ? `You are currently using <strong>v${APP_VERSION}</strong>. Update to the latest release for new features and fixes.` : `Kamu masih memakai versi <strong>v${APP_VERSION}</strong>. Perbarui ke rilis terbaru untuk fitur dan perbaikan terbaru.`}</p>
+      <div class="bp-modal-actions">
+        <a class="btn btn-primary" href="${escapeHtml(info.url)}" target="_blank" rel="noopener">${isEn ? "Update Now" : "Update Sekarang"}</a>
+        <button type="button" class="btn" id="bpUpdateLaterBtn">${isEn ? "Later" : "Nanti"}</button>
+      </div>
+    </div>
+  `;
+  host.appendChild(el);
+  const close = () => el.remove();
+  el.querySelector("#bpUpdateCloseBtn")?.addEventListener("click", close);
+  el.querySelector("#bpUpdateLaterBtn")?.addEventListener("click", close);
+  el.addEventListener("click", (e) => {
+    if (e.target === el) close();
+  });
+}
+
 async function checkAppUpdate() {
   let latest = "";
-  const url = `https://github.com/${GITHUB_REPO}/actions`;
+  let url = `https://github.com/${GITHUB_REPO}/releases/latest`;
   try {
-    const healthRes = await fetch(`${getApiBase()}/api/health`, { cache: "no-store" });
+    const healthRes = await fetch(`${getApiBase()}/api/health`, { cache: "no-store", signal: AbortSignal.timeout(4000) });
     if (healthRes.ok) {
       const info = await healthRes.json();
       if (info?.version) latest = String(info.version).replace(/^v/i, "");
+    }
+  } catch { }
+
+  try {
+    const ghRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (ghRes.ok) {
+      const gh = await ghRes.json();
+      const tagVer = String(gh?.tag_name || "").replace(/^v/i, "");
+      if (tagVer && (!latest || compareSemver(tagVer, latest) > 0)) {
+        latest = tagVer;
+      }
+      if (gh?.html_url) url = gh.html_url;
     }
   } catch { }
 
@@ -1526,12 +3154,30 @@ async function checkAppUpdate() {
   if (hasUpdate && statusEl?.lastElementChild && !statusEl.classList.contains("offline")) {
     statusEl.lastElementChild.textContent = `UPDATE v${latest}`;
   }
+  if (hasUpdate && getPrefs().autoUpdate) {
+    showUpdatePopupModal(latestUpdateInfo);
+  }
   return latestUpdateInfo;
 }
 
+let offlinePollTimer = null;
+
+function setOfflineBadge() {
+  clearTimeout(offlinePollTimer);
+  statusEl.classList.add("offline");
+  statusEl.lastElementChild.textContent = "OFFLINE";
+  offlinePollTimer = setTimeout(() => {
+    if (document.visibilityState === "visible") checkHealth();
+  }, 8000);
+}
+
 async function checkHealth() {
+  clearTimeout(offlinePollTimer);
   try {
-    const res = await fetch(`${getApiBase()}/api/health`);
+    const res = await fetch(`${getApiBase()}/api/health`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    });
     if (!res.ok) throw new Error();
     const info = await res.json();
     statusEl.classList.remove("offline");
@@ -1541,10 +3187,20 @@ async function checkHealth() {
       checkAppUpdate().catch(() => { });
     }
   } catch {
-    statusEl.classList.add("offline");
-    statusEl.lastElementChild.textContent = "OFFLINE";
+    setOfflineBadge();
   }
 }
+
+window.addEventListener("online", () => checkHealth());
+window.addEventListener("offline", () => setOfflineBadge());
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") checkHealth();
+});
+window.Capacitor?.Plugins?.Network?.addListener?.("networkStatusChange", (st) => {
+  if (st?.connected) checkHealth();
+  else setOfflineBadge();
+});
+statusEl?.addEventListener("click", () => checkHealth());
 
 history.replaceState({ page: "home" }, "");
 renderHome(true);

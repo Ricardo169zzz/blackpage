@@ -8,17 +8,17 @@ const COMIC_SERVERS = [
   { id: "komiku", label: "Komiku", tag: "ID" },
   { id: "manhwaindo", label: "Manhwaindo", tag: "ID" },
   { id: "komikcast", label: "Komikcast", tag: "ID" },
-  { id: "mangadex", label: "MangaDex", tag: "ID/EN" },
+  { id: "mangadex", label: "MangaDex (ID / EN)", tag: "ID/EN" },
 ];
 
 const CHAPTERS_PER_PAGE = 20;
 const AUTOSCROLL_KEY = "blackpage_comic_autoscroll_v1";
 const AUTOSCROLL_TIP_HIDE_KEY = "blackpage_comic_as_tip_hide_v1";
 const SPEED_PRESETS = [
-  { id: "pelan", label: "Pelan", pxPerSec: 32 },
-  { id: "sedang", label: "Sedang", pxPerSec: 65 },
-  { id: "cepat", label: "Cepat", pxPerSec: 115 },
-  { id: "kilat", label: "Kilat", pxPerSec: 185 },
+  { id: "pelan", label: "Pelan", enLabel: "Slow", pxPerSec: 32 },
+  { id: "sedang", label: "Sedang", enLabel: "Medium", pxPerSec: 65 },
+  { id: "cepat", label: "Cepat", enLabel: "Fast", pxPerSec: 115 },
+  { id: "kilat", label: "Kilat", enLabel: "Turbo", pxPerSec: 185 },
 ];
 
 function loadAutoScrollPrefs() {
@@ -75,11 +75,14 @@ function showAutoScrollTipModal() {
 }
 
 export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) {
+  const isEn = localStorage.getItem("tools_op_lang_v1") === "en";
+  const savedServer = localStorage.getItem("blackpage_comic_server_v1");
+  const comicLang = localStorage.getItem("blackpage_comic_lang_v1") === "en" ? "en" : "id";
   let lastSearchItems = [];
   let lastHasNext = false;
   let currentComic = null;
-  let activeServer = "auto";
-  let activeSource = "AUTO";
+  let activeServer = COMIC_SERVERS.some((s) => s.id === savedServer) ? savedServer : "auto";
+  let activeSource = activeServer === "mangadex" ? "MANGADEX · ID/EN" : activeServer.toUpperCase();
   let currentQuery = "";
   let currentPage = 1;
   let sortAsc = false;
@@ -88,12 +91,48 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
 
   let asPrefs = loadAutoScrollPrefs();
   let readerCleanup = null;
+  let topFloatCleanup = null;
 
   function cleanupReaderWidgets() {
     if (typeof readerCleanup === "function") {
       readerCleanup();
       readerCleanup = null;
     }
+    if (typeof topFloatCleanup === "function") {
+      topFloatCleanup();
+      topFloatCleanup = null;
+    }
+  }
+
+  function attachTopFloatBack(anchorBtn, labelHtml, onClick) {
+    if (typeof topFloatCleanup === "function") {
+      topFloatCleanup();
+      topFloatCleanup = null;
+    }
+    const workspace = stageEl.closest(".workspace");
+    if (!anchorBtn || !workspace) return;
+    const appShell = document.querySelector(".app-shell") || document.body;
+    const floatBtn = document.createElement("button");
+    floatBtn.type = "button";
+    floatBtn.className = "comic-top-float-back";
+    floatBtn.innerHTML = labelHtml;
+    floatBtn.style.top = `${(workspace.offsetTop || 60) + 6}px`;
+    appShell.appendChild(floatBtn);
+    floatBtn.addEventListener("click", onClick);
+
+    const onScroll = () => {
+      if (!anchorBtn.isConnected) return;
+      const show =
+        anchorBtn.getBoundingClientRect().bottom < workspace.getBoundingClientRect().top + 4;
+      floatBtn.classList.toggle("is-visible", show);
+    };
+    workspace.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+
+    topFloatCleanup = () => {
+      workspace.removeEventListener("scroll", onScroll);
+      floatBtn.remove();
+    };
   }
 
   function pushComicView(comicView) {
@@ -124,8 +163,8 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       <div class="comic-as-card">
         <span class="comic-as-label">AUTO SCROLL</span>
         <div class="comic-as-controls">
-          <button type="button" class="cat-pill ${asPrefs.enabled ? "active" : ""}" id="comicAsCycleSpeed" title="Ganti kecepatan">
-            ${escapeHtml(preset.label)} &rsaquo;
+          <button type="button" class="cat-pill ${asPrefs.enabled ? "active" : ""}" id="comicAsCycleSpeed" title="${isEn ? "Change speed" : "Ganti kecepatan"}">
+            ${escapeHtml(isEn ? preset.enLabel : preset.label)} &rsaquo;
           </button>
           <button type="button" class="toggle-switch ${asPrefs.enabled ? "on" : ""}" id="comicAsToggle" role="switch" aria-checked="${asPrefs.enabled ? "true" : "false"}" aria-label="Aktifkan Auto Scroll">
             <span class="toggle-knob"></span>
@@ -162,6 +201,22 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       .join("");
   }
 
+  function bindCoverLoaders(container) {
+    container?.querySelectorAll("img.comic-cover").forEach((img) => {
+      const wrap = img.closest(".comic-cover-wrap");
+      const done = () => {
+        img.classList.add("is-loaded");
+        wrap?.classList.remove("is-loading");
+      };
+      if (img.complete && img.naturalWidth > 0) {
+        done();
+      } else {
+        img.addEventListener("load", done, { once: true });
+        img.addEventListener("error", done, { once: true });
+      }
+    });
+  }
+
   function renderGridHtml(items) {
     if (!items.length) {
       return `<div class="alert alert-info">Komik tidak ditemukan. Coba kata kunci lain atau ganti server di atas.</div>`;
@@ -171,11 +226,10 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       .map(
         (item, i) => `
       <button type="button" class="comic-card" data-comic-idx="${i}" style="--comic-i:${Math.min(i, 11)};">
-        <div class="comic-cover-wrap">
-          ${
-            item.thumbnail
-              ? `<img class="comic-cover" src="${escapeHtml(makeProxyUrl(API_BASE, item.thumbnail, { referer: item.referer || "", fallback: true }))}" alt="${escapeHtml(item.title)}" loading="lazy" />`
-              : `<span class="comic-cover-fallback">KOMIK</span>`
+        <div class="comic-cover-wrap ${item.thumbnail ? "is-loading" : ""}">
+          ${item.thumbnail
+            ? `<img class="comic-cover" src="${escapeHtml(makeProxyUrl(API_BASE, item.thumbnail, { referer: item.referer || "", fallback: true }))}" alt="${escapeHtml(item.title)}" loading="lazy" />`
+            : `<span class="comic-cover-fallback">KOMIK</span>`
           }
           <span class="tag comic-type-tag">${escapeHtml(item.type || "KOMIK")}</span>
         </div>
@@ -201,12 +255,12 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
     const activeSrvObj = COMIC_SERVERS.find((s) => s.id === activeServer) || COMIC_SERVERS[0];
 
     stageEl.innerHTML = `
-      <button type="button" class="btn btn-sm" id="comicBackHome" style="margin-bottom:10px;">&larr; Halaman Utama</button>
+      <button type="button" class="btn btn-sm" id="comicBackHome" style="margin-bottom:10px;">${isEn ? "&larr; Home" : "&larr; Halaman Utama"}</button>
       <div class="panel-card">
         <div class="stage-head">
           <div>
-            <h2 class="stage-title">Baca Komik</h2>
-            <p class="stage-desc">Update terbaru &amp; pencarian komik Sub Indo.</p>
+            <h2 class="stage-title">${isEn ? "Read Comics" : "Baca Komik"}</h2>
+            <p class="stage-desc">${isEn ? "Latest updates &amp; comic search." : "Update terbaru &amp; pencarian komik Sub Indo."}</p>
           </div>
           <span class="tag" id="comicSourceTag">${escapeHtml(activeSource)}</span>
         </div>
@@ -228,19 +282,19 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
             id="comicSearchInput"
             class="brutal-input"
             type="search"
-            placeholder="Cari judul komik (kosongkan = terbaru)..."
+            placeholder="${isEn ? "Search comic title (empty = latest)..." : "Cari judul komik (kosongkan = terbaru)..."}"
             value="${escapeHtml(query)}"
           />
-          <button type="submit" id="comicSearchBtn" class="btn btn-primary" style="grid-column: 1 / -1;">Cari Komik</button>
+          <button type="submit" id="comicSearchBtn" class="btn btn-primary" style="grid-column: 1 / -1;">${isEn ? "Search Comics" : "Cari Komik"}</button>
         </form>
 
         <div class="comic-chips-row" id="comicQuickChips">
           ${["", "Solo Leveling", "One Piece", "Naruto", "Gotoubun"]
-            .map(
-              (q) =>
-                `<button type="button" class="cat-pill" data-comic-q="${escapeHtml(q)}">${escapeHtml(q || "Terbaru")}</button>`
-            )
-            .join("")}
+        .map(
+          (q) =>
+            `<button type="button" class="cat-pill" data-comic-q="${escapeHtml(q)}">${escapeHtml(q || (isEn ? "Latest" : "Terbaru"))}</button>`
+        )
+        .join("")}
         </div>
 
         <div id="comicFeedback"></div>
@@ -249,10 +303,13 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       </div>
     `;
 
-    stageEl.querySelector("#comicBackHome")?.addEventListener("click", () => {
+    const backHomeBtn = stageEl.querySelector("#comicBackHome");
+    const onBackHomeClick = () => {
       cleanupReaderWidgets();
       onBackHome();
-    });
+    };
+    backHomeBtn?.addEventListener("click", onBackHomeClick);
+    attachTopFloatBack(backHomeBtn, isEn ? "&larr; Home" : "&larr; Halaman Utama", onBackHomeClick);
 
     const asWrap = stageEl.querySelector("#comicAsFrontWrap");
     asWrap?.addEventListener("click", (e) => {
@@ -283,12 +340,13 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
     const grid = stageEl.querySelector("#comicGrid");
     const pageBar = stageEl.querySelector("#comicPageBar");
     const sourceTag = stageEl.querySelector("#comicSourceTag");
+    bindCoverLoaders(grid);
 
     async function doSearch(q, serverId = activeServer, page = 1) {
       currentQuery = q;
       currentPage = Math.max(1, page);
       btn.disabled = true;
-      btn.textContent = "Mencari...";
+      btn.textContent = isEn ? "Searching..." : "Mencari...";
       fb.innerHTML = "";
       grid.innerHTML = renderSkeletonGridHtml(6);
       pageBar.innerHTML = "";
@@ -296,28 +354,32 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
         const res = await fetch(`${API_BASE}/api/comic/search`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ q, server: serverId, page: currentPage }),
+          body: JSON.stringify({ q, server: serverId, page: currentPage, lang: comicLang }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
         lastSearchItems = (data.items || []).slice(0, 20);
         lastHasNext =
           typeof data.hasNext === "boolean" ? data.hasNext : lastSearchItems.length >= 20;
-        activeSource = (data.source || serverId).toUpperCase();
+        const rawSrc = (data.source || serverId).toLowerCase();
+        activeSource = rawSrc === "mangadex" ? "MANGADEX · ID/EN" : rawSrc.toUpperCase();
         if (sourceTag) sourceTag.textContent = activeSource;
         grid.innerHTML = renderGridHtml(lastSearchItems);
+        bindCoverLoaders(grid);
         pageBar.innerHTML =
           lastSearchItems.length || currentPage > 1
             ? renderPaginationHtml(currentPage, lastHasNext)
             : "";
         const workspace = stageEl.closest(".workspace");
-        if (workspace && page > 1) workspace.scrollTop = 0;
+        if (workspace && workspace.scrollTop > 0) {
+          workspace.scrollTo({ top: 0, behavior: "smooth" });
+        }
       } catch (err) {
         grid.innerHTML = "";
         fb.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message || "Gagal memuat komik.")}</div>`;
       } finally {
         btn.disabled = false;
-        btn.textContent = "Cari Komik";
+        btn.textContent = isEn ? "Search Comics" : "Cari Komik";
       }
     }
 
@@ -377,7 +439,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
     chapterQuery = "";
     chapterPage = 1;
     stageEl.innerHTML = `
-      <button type="button" class="btn btn-sm" id="comicBackSearch" style="margin-bottom:10px;">&larr; Daftar Komik</button>
+      <button type="button" class="btn btn-sm" id="comicBackSearch" style="margin-bottom:10px;">${isEn ? "&larr; Comic List" : "&larr; Daftar Komik"}</button>
       <div class="panel-card">
         <div class="comic-detail-head">
           <div class="comic-skeleton-cover" style="width:96px;flex-shrink:0;"></div>
@@ -390,13 +452,15 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
         </div>
       </div>
     `;
-    stageEl.querySelector("#comicBackSearch")?.addEventListener("click", goBackToSearch);
+    const backSearchBtn = stageEl.querySelector("#comicBackSearch");
+    backSearchBtn?.addEventListener("click", goBackToSearch);
+    attachTopFloatBack(backSearchBtn, isEn ? "&larr; Comic List" : "&larr; Daftar Komik", goBackToSearch);
 
     try {
       const res = await fetch(`${API_BASE}/api/comic/detail`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: item.url }),
+        body: JSON.stringify({ url: item.url, lang: comicLang }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
@@ -404,10 +468,12 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       renderComicDetail();
     } catch (err) {
       stageEl.innerHTML = `
-        <button type="button" class="btn btn-sm" id="comicBackSearch" style="margin-bottom:10px;">&larr; Daftar Komik</button>
-        <div class="panel-card"><div class="alert alert-error">${escapeHtml(err.message || "Gagal membuka komik.")}</div></div>
+        <button type="button" class="btn btn-sm" id="comicBackSearch" style="margin-bottom:10px;">${isEn ? "&larr; Comic List" : "&larr; Daftar Komik"}</button>
+        <div class="panel-card"><div class="alert alert-error">${escapeHtml(err.message || (isEn ? "Failed to open comic." : "Gagal membuka komik."))}</div></div>
       `;
-      stageEl.querySelector("#comicBackSearch")?.addEventListener("click", goBackToSearch);
+      const backSearchBtn = stageEl.querySelector("#comicBackSearch");
+      backSearchBtn?.addEventListener("click", goBackToSearch);
+      attachTopFloatBack(backSearchBtn, isEn ? "&larr; Comic List" : "&larr; Daftar Komik", goBackToSearch);
     }
   }
 
@@ -429,14 +495,13 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
     const paged = filtered.slice(start, start + CHAPTERS_PER_PAGE);
 
     stageEl.innerHTML = `
-      <button type="button" class="btn btn-sm" id="comicBackSearch" style="margin-bottom:10px;">&larr; Daftar Komik</button>
+      <button type="button" class="btn btn-sm" id="comicBackSearch" style="margin-bottom:10px;">${isEn ? "&larr; Comic List" : "&larr; Daftar Komik"}</button>
       <div class="panel-card">
         <div class="comic-detail-head">
-          ${
-            currentComic.thumbnail
-              ? `<img class="comic-detail-cover" src="${escapeHtml(makeProxyUrl(API_BASE, currentComic.thumbnail, { referer: currentComic.referer || "", fallback: true }))}" alt="${escapeHtml(currentComic.title)}" />`
-              : ""
-          }
+          ${currentComic.thumbnail
+        ? `<img class="comic-detail-cover" src="${escapeHtml(makeProxyUrl(API_BASE, currentComic.thumbnail, { referer: currentComic.referer || "", fallback: true }))}" alt="${escapeHtml(currentComic.title)}" />`
+        : ""
+      }
           <div class="comic-detail-meta">
             <h2 class="stage-title" style="font-size:1.05rem;">${escapeHtml(currentComic.title)}</h2>
             <span class="tag">${currentComic.chapters.length} CHAPTER</span>
@@ -446,49 +511,49 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
         </div>
 
         <div class="support-head" style="margin-top:12px;">
-          <div class="field-label" style="margin:0;">DAFTAR CHAPTER</div>
-          <button type="button" class="btn btn-sm" id="comicSortBtn">${sortAsc ? "Terlama ↑" : "Terbaru ↓"}</button>
+          <div class="field-label" style="margin:0;">${isEn ? "CHAPTER LIST" : "DAFTAR CHAPTER"}</div>
+          <button type="button" class="btn btn-sm" id="comicSortBtn">${sortAsc ? (isEn ? "Oldest ↑" : "Terlama ↑") : (isEn ? "Newest ↓" : "Terbaru ↓")}</button>
         </div>
 
         <input
           id="comicChSearch"
           class="brutal-input"
           type="search"
-          placeholder="Cari chapter (mis. 120, 45)..."
+          placeholder="${isEn ? "Search chapter (e.g. 120, 45)..." : "Cari chapter (mis. 120, 45)..."}"
           value="${escapeHtml(chapterQuery)}"
           style="margin-bottom:10px;"
         />
 
         <div class="comic-chapter-list" id="comicChapterList">
-          ${
-            paged.length
-              ? paged
-                  .map(
-                    ({ ch, idx }, pos) => `
+          ${paged.length
+        ? paged
+          .map(
+            ({ ch, idx }, pos) => `
                   <button type="button" class="comic-chapter-btn" data-ch-idx="${idx}" style="--comic-i:${Math.min(pos, 12)};">
                     <span>${escapeHtml(ch.title)}</span>
-                    <span class="tag">BACA</span>
+                    <span class="tag">${isEn ? "READ" : "BACA"}</span>
                   </button>
                 `
-                  )
-                  .join("")
-              : `<div class="alert alert-info">Belum ada chapter tersedia.</div>`
-          }
+          )
+          .join("")
+        : `<div class="alert alert-info">${isEn ? "No chapters available." : "Belum ada chapter tersedia."}</div>`
+      }
         </div>
 
-        ${
-          filtered.length > CHAPTERS_PER_PAGE
-            ? `<div class="comic-pagination" id="comicChPager">
+        ${filtered.length > CHAPTERS_PER_PAGE
+        ? `<div class="comic-pagination" id="comicChPager">
                 <button type="button" class="btn btn-sm" id="comicChPrev" ${chapterPage <= 1 ? "disabled" : ""}>&larr; Prev</button>
                 <span class="tag">HAL ${chapterPage}/${totalPages}</span>
                 <button type="button" class="btn btn-sm btn-primary" id="comicChNext" ${chapterPage >= totalPages ? "disabled" : ""}>Next &rarr;</button>
               </div>`
-            : ""
-        }
+        : ""
+      }
       </div>
     `;
 
-    stageEl.querySelector("#comicBackSearch")?.addEventListener("click", goBackToSearch);
+    const backSearchBtn = stageEl.querySelector("#comicBackSearch");
+    backSearchBtn?.addEventListener("click", goBackToSearch);
+    attachTopFloatBack(backSearchBtn, isEn ? "&larr; Comic List" : "&larr; Daftar Komik", goBackToSearch);
     stageEl.querySelector("#comicSortBtn")?.addEventListener("click", () => {
       sortAsc = !sortAsc;
       chapterPage = 1;
@@ -530,11 +595,13 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
     if (!ch) return;
     pushComicView("read");
     const workspace = stageEl.closest(".workspace");
-    if (workspace) workspace.scrollTop = 0;
+    if (workspace && workspace.scrollTop > 0) {
+      workspace.scrollTo({ top: 0, behavior: "smooth" });
+    }
 
     stageEl.innerHTML = `
-      <button type="button" class="btn btn-sm" id="comicBackDetail" style="margin-bottom:10px;">&larr; Daftar Chapter</button>
-      <div class="panel-card"><div class="alert alert-info">Memuat halaman ${escapeHtml(ch.title)}...</div></div>
+      <button type="button" class="btn btn-sm" id="comicBackDetail" style="margin-bottom:10px;">${isEn ? "&larr; Chapters" : "&larr; Daftar Chapter"}</button>
+      <div class="panel-card"><div class="alert alert-info">${isEn ? "Loading" : "Memuat halaman"} ${escapeHtml(ch.title)}...</div></div>
     `;
     stageEl.querySelector("#comicBackDetail")?.addEventListener("click", goBackToDetail);
 
@@ -551,25 +618,25 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       const hasNext = chIdx < currentComic.chapters.length - 1;
       const navHtml = `
         <div class="comic-reader-nav">
-          <button type="button" class="btn btn-sm" data-nav-ch="${chIdx - 1}" ${hasPrev ? "" : "disabled"}>&larr; Sebelumnya</button>
-          <span class="tag">${data.pages.length} HAL</span>
-          <button type="button" class="btn btn-sm btn-primary" data-nav-ch="${chIdx + 1}" ${hasNext ? "" : "disabled"}>Berikutnya &rarr;</button>
+          <button type="button" class="btn btn-sm" data-nav-ch="${chIdx - 1}" ${hasPrev ? "" : "disabled"}>${isEn ? "&larr; Prev" : "&larr; Sebelumnya"}</button>
+          <span class="tag">${data.pages.length} ${isEn ? "PGS" : "HAL"}</span>
+          <button type="button" class="btn btn-sm btn-primary" data-nav-ch="${chIdx + 1}" ${hasNext ? "" : "disabled"}>${isEn ? "Next &rarr;" : "Berikutnya &rarr;"}</button>
         </div>
       `;
 
       const ref = data.referer || currentComic?.referer || "";
       stageEl.innerHTML = `
-        <button type="button" class="btn btn-sm" id="comicBackDetail" style="margin-bottom:10px;">&larr; Daftar Chapter</button>
+        <button type="button" class="btn btn-sm" id="comicBackDetail" style="margin-bottom:10px;">${isEn ? "&larr; Chapters" : "&larr; Daftar Chapter"}</button>
         <div class="panel-card" style="padding:10px;">
           <h2 class="stage-title" style="font-size:0.95rem;margin-bottom:8px;">${escapeHtml(data.title || ch.title)}</h2>
           ${navHtml}
           <div class="comic-reader-pages" id="comicReaderPages">
             ${(data.pages || [])
-              .map(
-                (src, i) =>
-                  `<img class="comic-page-img" data-page-src="${escapeHtml(makeProxyUrl(API_BASE, src, { referer: ref }))}" alt="Halaman ${i + 1}" />`
-              )
-              .join("")}
+          .map(
+            (src, i) =>
+              `<img class="comic-page-img" data-page-src="${escapeHtml(makeProxyUrl(API_BASE, src, { referer: ref }))}" alt="Halaman ${i + 1}" />`
+          )
+          .join("")}
           </div>
           ${navHtml}
         </div>
@@ -582,7 +649,7 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
       const floatBack = document.createElement("button");
       floatBack.type = "button";
       floatBack.className = "comic-float-back";
-      floatBack.innerHTML = `&larr; Kembali`;
+      floatBack.innerHTML = isEn ? `&larr; Back` : `&larr; Kembali`;
       appShell.appendChild(floatBack);
       floatBack.addEventListener("click", goBackToDetail);
 
@@ -698,21 +765,20 @@ export function mountComicReader(stageEl, { API_BASE, escapeHtml, onBackHome }) 
         floatAs.hidden = false;
         const preset = SPEED_PRESETS[asPrefs.speedIdx] || SPEED_PRESETS[1];
         floatAs.innerHTML = `
-          ${
-            speedMenuOpen
-              ? `<div class="comic-as-pop">
+          ${speedMenuOpen
+            ? `<div class="comic-as-pop">
                   ${SPEED_PRESETS.map(
-                    (p, idx) =>
-                      `<button type="button" class="cat-pill ${idx === asPrefs.speedIdx ? "active" : ""}" data-as-pick="${idx}">${escapeHtml(p.label)}</button>`
-                  ).join("")}
+              (p, idx) =>
+                `<button type="button" class="cat-pill ${idx === asPrefs.speedIdx ? "active" : ""}" data-as-pick="${idx}">${escapeHtml(isEn ? p.enLabel : p.label)}</button>`
+            ).join("")}
                 </div>`
-              : ""
+            : ""
           }
           <div class="comic-as-pill">
             <span class="comic-as-dot ${paused ? "is-paused" : ""}"></span>
-            <button type="button" class="comic-as-btn" data-as-speed-pop>${escapeHtml(preset.label)} ▾</button>
+            <button type="button" class="comic-as-btn" data-as-speed-pop>${escapeHtml(isEn ? preset.enLabel : preset.label)} ▾</button>
             <button type="button" class="comic-as-btn" data-as-toggle-pause>${paused ? "▶" : "❚❚"}</button>
-            <button type="button" class="comic-as-btn" data-as-off aria-label="Matikan Auto Scroll">&times;</button>
+            <button type="button" class="comic-as-btn" data-as-off aria-label="${isEn ? "Turn off Auto Scroll" : "Matikan Auto Scroll"}">&times;</button>
           </div>
         `;
       };
