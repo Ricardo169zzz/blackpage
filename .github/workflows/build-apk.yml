@@ -124,7 +124,7 @@ jobs:
 
       - name: Patch AndroidManifest.xml permissions & cleartext
         run: |
-          node -e '
+          node << 'EOF'
             const fs = require("fs");
             const p = "android/app/src/main/AndroidManifest.xml";
             let xml = fs.readFileSync(p, "utf8");
@@ -376,7 +376,7 @@ jobs:
               ].join("\n");
               fs.writeFileSync(maPath, maCode);
             }
-          '
+          EOF
 
       - name: Build Debug APK
         working-directory: android
