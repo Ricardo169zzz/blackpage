@@ -174,7 +174,30 @@ async function fetchOtakudesuDirectNative(endpoint, body = {}) {
   if (resp.status < 200 || resp.status >= 300 || typeof resp.data !== "string") {
     throw new Error(`Otakudesu HTTP ${resp.status}`);
   }
-  return parseOtakudesuHtml(parseKind, resp.data, body);
+  const parsed = parseOtakudesuHtml(parseKind, resp.data, body);
+  if (parseKind === "episode" && parsed.embedUrl && !/google|ads/i.test(parsed.embedUrl)) {
+    try {
+      const pResp = await capHttp.get({
+        url: parsed.embedUrl,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+          Referer: "https://otakudesu.blog/",
+        },
+      });
+      if (pResp.status >= 200 && pResp.status < 300 && typeof pResp.data === "string") {
+        const pHtml = pResp.data;
+        const src =
+          pHtml.match(/<video[^>]*>[\s\S]*?<source[^>]+src=["']([^"']+)["']/i)?.[1] ||
+          pHtml.match(/<video[^>]+src=["']([^"']+)["']/i)?.[1] ||
+          pHtml.match(/<source[^>]+src=["']([^"']+)["']/i)?.[1] ||
+          pHtml.match(/(?:file|src)\s*:\s*["'](https?:\/\/[^"']+\.mp4[^"']*)["']/i)?.[1] ||
+          pHtml.match(/https?:\/\/[^"'\s<>]+\.mp4(?:\?[^"'\s<>]*)?/i)?.[0] ||
+          pHtml.match(/https?:\/\/[^"'\s<>]*(?:googlevideo\.com\/videoplayback|cdn\.odcloud\.net\/[^"'\s<>]+)/i)?.[0];
+        if (src) parsed.streamUrl = src.replace(/&amp;/g, "&");
+      }
+    } catch {}
+  }
+  return parsed;
 }
 
 export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlayer, onRouteChange, onExit }) {
@@ -595,14 +618,20 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
     try {
       const data = await requestAnimeApi("episode", { url: epUrl });
 
-      const proxyVideo = data.streamUrl
-        ? `${API_BASE}/api/media?${new URLSearchParams({ url: data.streamUrl }).toString()}`
+      const isNative = Boolean(window.Capacitor?.isNativePlatform?.());
+      const videoSrc = data.streamUrl
+        ? (isNative ? data.streamUrl : `${API_BASE}/api/media?${new URLSearchParams({ url: data.streamUrl }).toString()}`)
         : "";
 
-      const playerHtml = proxyVideo
-        ? `<video class="video-preview" id="animeStreamVideo" src="${escapeHtml(proxyVideo)}" autoplay playsinline preload="auto"></video>`
+      const playerHtml = videoSrc
+        ? `<video class="video-preview" id="animeStreamVideo" src="${escapeHtml(videoSrc)}" controls autoplay playsinline preload="auto"></video>`
         : data.embedUrl
-          ? `<div class="bp-anime-iframe-wrap"><iframe src="${escapeHtml(data.embedUrl)}" allowfullscreen frameborder="0" referrerpolicy="no-referrer"></iframe></div>`
+          ? (isNative
+            ? `<div class="alert alert-info" style="display:flex;flex-direction:column;gap:10px;">
+                <span>Player tidak mendukung embed di dalam aplikasi (diblokir CSP).</span>
+                <a class="btn btn-primary btn-sm" href="${escapeHtml(data.embedUrl)}" target="_blank" rel="noopener noreferrer">Buka Player di Browser ↗</a>
+              </div>`
+            : `<div class="bp-anime-iframe-wrap"><iframe src="${escapeHtml(data.embedUrl)}" allowfullscreen frameborder="0" referrerpolicy="no-referrer"></iframe></div>`)
           : `<div class="alert alert-error">Stream tidak tersedia untuk episode ini.</div>`;
 
       const isDownloaded = loadAnimeDownloads().some((d) => d.episodeUrl === epUrl);

@@ -53,11 +53,26 @@ export async function resolveOfflineThumbSrc(API_BASE, item) {
   if (!item) return "";
   const cap = window.Capacitor;
   const fs = cap?.Plugins?.Filesystem;
-  if (cap?.isNativePlatform?.() && fs && item.thumbFilename) {
-    for (const [dir, path] of [
-      ["DATA", `thumbs/${item.thumbFilename}`],
-      ["EXTERNAL_STORAGE", `Download/Blackpage/thumb/${item.thumbFilename}`],
-    ]) {
+  if (cap?.isNativePlatform?.() && fs) {
+    const stem = item.filename ? String(item.filename).replace(/\.[^.]+$/, "") : "";
+    const candidates = [];
+    if (item.thumbFilename) {
+      candidates.push(["DATA", `thumbs/${item.thumbFilename}`]);
+      candidates.push(["EXTERNAL_STORAGE", `Download/Blackpage/thumb/${item.thumbFilename}`]);
+    }
+    if (stem) {
+      candidates.push(["DATA", `thumbs/thumb_${stem}.jpg`]);
+      candidates.push(["EXTERNAL_STORAGE", `Download/Blackpage/thumb/thumb_${stem}.jpg`]);
+      candidates.push(["EXTERNAL_STORAGE", `Download/Blackpage/thumb/${stem}.jpg`]);
+    }
+    if (item.mediaType === "image") {
+      if (item.localPath) candidates.push(["EXTERNAL_STORAGE", item.localPath]);
+      if (item.filename) {
+        candidates.push(["EXTERNAL_STORAGE", `Download/Blackpage/image/${item.filename}`]);
+        candidates.push(["EXTERNAL_STORAGE", `Download/Blackpage/${item.filename}`]);
+      }
+    }
+    for (const [dir, path] of candidates) {
       try {
         await fs.stat({ path, directory: dir });
         const res = await fs.getUri({ path, directory: dir });
@@ -66,15 +81,18 @@ export async function resolveOfflineThumbSrc(API_BASE, item) {
       } catch {}
     }
   }
-  if (typeof caches !== "undefined" && item.thumbnail) {
-    try {
-      const cache = await caches.open(THUMB_CACHE_NAME);
-      const match = await cache.match(makeProxyUrl(API_BASE, item.thumbnail));
-      if (match) {
-        const blob = await match.blob();
-        return URL.createObjectURL(blob);
-      }
-    } catch {}
+  if (typeof caches !== "undefined") {
+    const urls = [item.thumbnail, item.mediaType === "image" ? item.mediaUrl : ""].filter(Boolean);
+    for (const u of urls) {
+      try {
+        const cache = await caches.open(THUMB_CACHE_NAME);
+        const match = await cache.match(makeProxyUrl(API_BASE, u));
+        if (match) {
+          const blob = await match.blob();
+          return URL.createObjectURL(blob);
+        }
+      } catch {}
+    }
   }
   return "";
 }

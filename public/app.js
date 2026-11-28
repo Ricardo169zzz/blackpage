@@ -9,7 +9,9 @@ const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
 const THEME_KEY = "tools_op_theme_v1";
 const PREFS_KEY = "tools_op_prefs_v1";
-const APP_VERSION = "1.6.1";
+const ONBOARDED_KEY = "tools_op_onboarded_v1";
+const INTRO_STYLE_KEY = "tools_op_intro_style_v1";
+const APP_VERSION = "1.6.2";
 const GITHUB_REPO = "Ricardo169zzz/blackpage";
 
 const DEFAULT_PREFS = {
@@ -33,7 +35,11 @@ const DEFAULT_PREFS = {
 export function getPrefs() {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    return raw ? { ...DEFAULT_PREFS, ...JSON.parse(raw) } : { ...DEFAULT_PREFS };
+    const parsed = raw ? { ...DEFAULT_PREFS, ...JSON.parse(raw) } : { ...DEFAULT_PREFS };
+    if (localStorage.getItem(ONBOARDED_KEY) === "1") parsed.onboardingDone = true;
+    const savedIntro = localStorage.getItem(INTRO_STYLE_KEY);
+    if (savedIntro) parsed.introStyle = savedIntro;
+    return parsed;
   } catch {
     return { ...DEFAULT_PREFS };
   }
@@ -41,6 +47,8 @@ export function getPrefs() {
 
 function savePrefs(next) {
   localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+  if (next?.onboardingDone) localStorage.setItem(ONBOARDED_KEY, "1");
+  if (next?.introStyle) localStorage.setItem(INTRO_STYLE_KEY, String(next.introStyle));
 }
 
 let wakeLockSentinel = null;
@@ -1198,12 +1206,32 @@ function renderGallery(fromPopstate = false) {
   const hydrateOfflineThumbs = (container) => {
     const apiBase = getApiBase();
     const allItems = loadGalleryItems();
-    container.querySelectorAll("img.gallery-thumb[data-thumb-idx]").forEach((img) => {
-      const it = allItems[Number(img.dataset.thumbIdx)];
+    container.querySelectorAll(".gallery-grid-item[data-open-gallery]").forEach((card) => {
+      const idx = Number(card.dataset.openGallery);
+      const it = allItems[idx];
       if (!it) return;
-      resolveOfflineThumbSrc(apiBase, it).then((localThumb) => {
-        if (localThumb && img.isConnected) img.src = localThumb;
-      });
+      const webLocal =
+        (it.thumbFilename && sessionLocalMediaUrls.get(it.thumbFilename)) ||
+        (it.mediaType === "image" && it.filename && sessionLocalMediaUrls.get(it.filename)) ||
+        "";
+      const applyThumb = (src) => {
+        if (!src || !card.isConnected) return;
+        const existingImg = card.querySelector("img.gallery-thumb");
+        if (existingImg) {
+          existingImg.src = src;
+          existingImg.closest(".gallery-thumb-wrap")?.classList.remove("is-loading");
+        } else {
+          const fallback = card.querySelector(".gallery-thumb-fallback");
+          if (fallback) {
+            fallback.outerHTML = `<span class="gallery-thumb-wrap"><img class="gallery-thumb" data-thumb-idx="${idx}" src="${escapeHtml(src)}" alt="Media" /></span>`;
+          }
+        }
+      };
+      if (webLocal) {
+        applyThumb(webLocal);
+        return;
+      }
+      resolveOfflineThumbSrc(apiBase, it).then(applyThumb);
     });
   };
   hydrateOfflineThumbs(listEl);
@@ -1230,18 +1258,22 @@ function renderGallery(fromPopstate = false) {
 
 const sessionLocalMediaUrls = new Map();
 
-function classifyDeviceFilename(name = "") {
+function classifyDeviceFilename(name = "", fullPath = "") {
   const lower = String(name).toLowerCase();
+  const pathLower = String(fullPath).toLowerCase();
   if (/\.json$/i.test(lower)) return "backup";
   if (/\.(mp3|m4a|wav|ogg|aac|flac|opus)$/i.test(lower)) return "audio";
   if (/\.(mp4|mkv|webm|mov|3gp)$/i.test(lower)) return "video";
-  if (/\.(jpg|jpeg|png|webp)$/i.test(lower)) return "image";
+  if (/\.(jpg|jpeg|png|webp)$/i.test(lower)) {
+    return /(?:^|\/)thumb(?:\/|$)/i.test(pathLower) ? "thumb" : "image";
+  }
   return "";
 }
 
-async function scanDeviceBlackpageFolder(folderPath = "Download/Blackpage") {
+async function scanDeviceBlackpageFolder(folderPath = "Download/Blackpage", onProgress = null) {
   const cap = window.Capacitor;
   const fs = cap?.Plugins?.Filesystem;
+  const prefs = getPrefs();
   const cleanFolder = String(folderPath || "Download/Blackpage").replace(/^\/+|\/+$/g, "");
   const result = {
     platform: cap?.isNativePlatform?.() && fs ? "android" : "web",
@@ -1249,36 +1281,70 @@ async function scanDeviceBlackpageFolder(folderPath = "Download/Blackpage") {
     backups: [],
     audios: [],
     videos: [],
+    thumbs: [],
     images: [],
     entries: [],
+    counts: { video: 0, audio: 0, thumb: 0, image: 0, backup: 0 },
     totalCount: 0,
+    error: "",
   };
 
   if (result.platform !== "android") return result;
 
-  const subPaths = [cleanFolder, `${cleanFolder}/audio`, `${cleanFolder}/video`];
-  const seen = new Set();
+  try {
+    await fs.requestPermissions?.();
+  } catch { }
 
-  for (const dirPath of subPaths) {
+  const candidateDirs = [
+    { dir: cleanFolder, forceKind: "" },
+    { dir: `${cleanFolder}/video`, forceKind: "video" },
+    { dir: `${cleanFolder}/audio`, forceKind: "audio" },
+    { dir: `${cleanFolder}/thumb`, forceKind: "thumb" },
+    { dir: `${cleanFolder}/image`, forceKind: "image" },
+  ];
+
+  if (cleanFolder === "Download/Blackpage") {
+    const customV = String(prefs.videoFolder || "").replace(/^\/+|\/+$/g, "");
+    const customA = String(prefs.audioFolder || "").replace(/^\/+|\/+$/g, "");
+    if (customV && !candidateDirs.some((d) => d.dir === customV)) {
+      candidateDirs.push({ dir: customV, forceKind: "video" });
+    }
+    if (customA && !candidateDirs.some((d) => d.dir === customA)) {
+      candidateDirs.push({ dir: customA, forceKind: "audio" });
+    }
+  }
+
+  const seen = new Set();
+  for (const target of candidateDirs) {
+    if (onProgress) {
+      onProgress({ scanningDir: target.dir, counts: { ...result.counts } });
+    }
     try {
-      const listed = await fs.readdir({ path: dirPath, directory: "EXTERNAL_STORAGE" });
+      const listed = await fs.readdir({ path: target.dir, directory: "EXTERNAL_STORAGE" });
       for (const entry of listed?.files || []) {
         const name = typeof entry === "string" ? entry : entry?.name;
         const type = typeof entry === "object" ? entry?.type : "file";
         if (!name || type === "directory") continue;
-        const fullPath = `${dirPath}/${name}`;
+        const fullPath = `${target.dir}/${name}`;
         if (seen.has(fullPath)) continue;
-        const kind = classifyDeviceFilename(name);
+        let kind = classifyDeviceFilename(name, fullPath);
         if (!kind) continue;
+        if (target.forceKind === "thumb" && kind === "image") kind = "thumb";
         seen.add(fullPath);
         const item = { name, path: fullPath, kind };
         result.entries.push(item);
         if (kind === "backup") result.backups.push(item);
         else if (kind === "audio") result.audios.push(item);
         else if (kind === "video") result.videos.push(item);
+        else if (kind === "thumb") result.thumbs.push(item);
         else if (kind === "image") result.images.push(item);
+        result.counts[kind] = (result.counts[kind] || 0) + 1;
       }
-    } catch { }
+    } catch (err) {
+      if (target.dir === cleanFolder && /permission|denied/i.test(err?.message || "")) {
+        result.error = "Izin penyimpanan ditolak. Izinkan akses file di pengaturan HP.";
+      }
+    }
   }
 
   result.totalCount = result.entries.length;
@@ -1295,30 +1361,40 @@ function scanWebFileList(fileList) {
     backups: [],
     audios: [],
     videos: [],
+    thumbs: [],
     images: [],
     entries: [],
+    counts: { video: 0, audio: 0, thumb: 0, image: 0, backup: 0 },
     totalCount: 0,
+    error: "",
   };
 
   for (const file of files) {
-    const kind = classifyDeviceFilename(file.name);
+    const rel = file.webkitRelativePath || file.name;
+    const kind = classifyDeviceFilename(file.name, rel);
     if (!kind) continue;
-    const item = { name: file.name, path: file.webkitRelativePath || file.name, kind, file };
+    const item = { name: file.name, path: rel, kind, file };
     result.entries.push(item);
     if (kind === "backup") result.backups.push(item);
     else if (kind === "audio") result.audios.push(item);
     else if (kind === "video") result.videos.push(item);
+    else if (kind === "thumb") result.thumbs.push(item);
     else if (kind === "image") result.images.push(item);
+    result.counts[kind] = (result.counts[kind] || 0) + 1;
   }
   result.totalCount = result.entries.length;
   return result;
 }
 
+function baseMediaStem(name = "") {
+  return String(name).replace(/\.[^.]+$/, "").replace(/^thumb[_-]?/i, "").toLowerCase();
+}
+
 async function syncScannedFolderData(scanResult) {
   if (!scanResult || !scanResult.totalCount) return { synced: false, addedCount: 0, backupRestored: false };
   let backupRestored = false;
+  const keepIntroStyle = getPrefs().introStyle;
 
-  // 1. Restore latest Blackpage JSON backup if present
   const backupFile = scanResult.backups.find((b) => /blackpage/i.test(b.name)) || scanResult.backups[0];
   if (backupFile) {
     try {
@@ -1328,10 +1404,8 @@ async function syncScannedFolderData(scanResult) {
       } else {
         const fs = window.Capacitor?.Plugins?.Filesystem;
         if (fs) {
-          const read = await fs.readFile({ path: backupFile.path, directory: "EXTERNAL_STORAGE" });
-          if (read?.data) {
-            text = decodeURIComponent(escape(atob(read.data)));
-          }
+          const read = await fs.readFile({ path: backupFile.path, directory: "EXTERNAL_STORAGE", encoding: "utf8" });
+          text = read?.data || "";
         }
       }
       if (text) {
@@ -1341,7 +1415,7 @@ async function syncScannedFolderData(scanResult) {
             localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(data.history.slice(0, 30)));
           }
           if (data.prefs && typeof data.prefs === "object") {
-            savePrefs({ ...DEFAULT_PREFS, ...data.prefs, onboardingDone: true });
+            savePrefs({ ...DEFAULT_PREFS, ...data.prefs, introStyle: keepIntroStyle, onboardingDone: true });
           }
           if (typeof data.theme === "string") {
             localStorage.setItem(THEME_KEY, data.theme);
@@ -1356,34 +1430,47 @@ async function syncScannedFolderData(scanResult) {
     } catch { }
   }
 
-  // 2. Merge audio & video files from the scanned folder into gallery/music history
+  // Map thumbnails by stem for matching video/audio
+  const thumbByStem = new Map();
+  for (const t of scanResult.thumbs || []) {
+    if (t.file && !sessionLocalMediaUrls.has(t.name)) {
+      sessionLocalMediaUrls.set(t.name, URL.createObjectURL(t.file));
+    }
+    thumbByStem.set(baseMediaStem(t.name), t);
+  }
+
   const existing = loadGalleryItems();
-  const knownFiles = new Set(existing.map((x) => x.filename).filter(Boolean));
+  const byFile = new Map(existing.filter((x) => x.filename).map((x) => [x.filename, x]));
   let addedCount = 0;
 
-  for (const media of [...scanResult.audios, ...scanResult.videos]) {
+  for (const media of [...scanResult.audios, ...scanResult.videos, ...(scanResult.images || [])]) {
     if (media.file && !sessionLocalMediaUrls.has(media.name)) {
       sessionLocalMediaUrls.set(media.name, URL.createObjectURL(media.file));
     }
-    if (!knownFiles.has(media.name)) {
-      knownFiles.add(media.name);
-      existing.unshift({
+    const matchedThumb = thumbByStem.get(baseMediaStem(media.name));
+    const prev = byFile.get(media.name);
+    if (prev) {
+      prev.localPath = media.path;
+      if (matchedThumb && !prev.thumbFilename) prev.thumbFilename = matchedThumb.name;
+    } else {
+      const entry = {
         id: `sync_${Date.now()}_${addedCount}`,
         title: media.name.replace(/\.[^.]+$/, ""),
         author: "Lokal",
         platform: "local",
-        mediaType: media.kind === "audio" ? "audio" : "video",
+        mediaType: media.kind === "audio" ? "audio" : media.kind === "image" ? "image" : "video",
         filename: media.name,
         localPath: media.path,
+        thumbFilename: matchedThumb?.name || "",
         downloadedAt: new Date().toISOString(),
-      });
+      };
+      existing.unshift(entry);
+      byFile.set(media.name, entry);
       addedCount += 1;
     }
   }
 
-  if (addedCount > 0) {
-    localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(existing.slice(0, 30)));
-  }
+  localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(existing.slice(0, 30)));
 
   if (scanResult.folder && scanResult.platform === "android") {
     const curPrefs = getPrefs();
@@ -1941,7 +2028,7 @@ function renderBackupSettings() {
         </button>
         <label class="btn" style="text-align:center;cursor:pointer;">
           ${isEn ? "Import / Restore (.json)" : "Impor / Pulihkan (.json)"}
-          <input type="file" id="importBackupInput" accept="application/json,.json" hidden />
+          <input type="file" id="importBackupInput" accept=".json,application/json,text/plain,*/*" hidden />
         </label>
       </div>
     </div>
@@ -2544,12 +2631,13 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
         const cap = window.Capacitor;
         const fs = cap?.Plugins?.Filesystem;
         if (cap?.isNativePlatform?.() && fs) {
+          await fs.requestPermissions?.().catch(() => { });
           await fs.mkdir({ path: "Download/Blackpage", directory: "EXTERNAL_STORAGE", recursive: true }).catch(() => { });
-          const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
           await fs.writeFile({
             path: `Download/Blackpage/${filename}`,
-            data: b64,
+            data: jsonStr,
             directory: "EXTERNAL_STORAGE",
+            encoding: "utf8",
             recursive: true,
           });
           feedback.innerHTML = `<div class="alert alert-info">${isEn ? "Saved to" : "Tersimpan di"} Download/Blackpage/${escapeHtml(filename)}</div>`;
@@ -2574,16 +2662,29 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
       const file = importInput.files?.[0];
       if (!file) return;
       try {
-        const text = await file.text();
+        const text = typeof file.text === "function"
+          ? await file.text()
+          : await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ""));
+            reader.onerror = () => reject(new Error("Gagal membaca file backup"));
+            reader.readAsText(file);
+          });
         const data = JSON.parse(text);
         if (!data || typeof data !== "object" || data.app !== "Blackpage") {
           throw new Error(isEn ? "Invalid Blackpage backup file" : "File backup Blackpage tidak valid");
         }
+        const keepPrefs = getPrefs();
         if (Array.isArray(data.history)) {
           localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(data.history.slice(0, 30)));
         }
         if (data.prefs && typeof data.prefs === "object") {
-          savePrefs({ ...DEFAULT_PREFS, ...data.prefs });
+          savePrefs({
+            ...DEFAULT_PREFS,
+            ...data.prefs,
+            introStyle: keepPrefs.introStyle || data.prefs.introStyle || "bauhaus",
+            onboardingDone: true,
+          });
         }
         if (typeof data.theme === "string") {
           localStorage.setItem(THEME_KEY, data.theme);
@@ -2591,6 +2692,10 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
         }
         if (typeof data.lang === "string") {
           localStorage.setItem(LANG_KEY, data.lang);
+        }
+        const scanned = await scanDeviceBlackpageFolder("Download/Blackpage").catch(() => null);
+        if (scanned?.totalCount) {
+          await syncScannedFolderData(scanned).catch(() => { });
         }
         applyMotionPref();
         applyBgEffectPref();
@@ -2601,6 +2706,8 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
         if (fb) fb.innerHTML = `<div class="alert alert-info">${isEn ? "Backup restored successfully!" : "Data & pengaturan berhasil dipulihkan!"}</div>`;
       } catch (err) {
         feedback.innerHTML = `<div class="alert alert-error">${escapeHtml(err?.message || "Gagal membaca file backup.")}</div>`;
+      } finally {
+        importInput.value = "";
       }
     });
 
@@ -2951,13 +3058,74 @@ function upgradeVideoPlayer(videoEl) {
     syncMute();
   });
 
+  const showLandscapePrompt = () => {
+    wrap.querySelector(".bp-fs-orient-prompt")?.remove();
+    const promptEl = document.createElement("div");
+    promptEl.className = "bp-fs-orient-prompt";
+    promptEl.innerHTML = `
+      <span>Mode Landscape?</span>
+      <button type="button" class="btn btn-sm btn-primary" data-orient="yes">Iya</button>
+      <button type="button" class="btn btn-sm" data-orient="no">Tidak</button>
+    `;
+    wrap.appendChild(promptEl);
+
+    promptEl.querySelector('[data-orient="yes"]')?.addEventListener("click", async () => {
+      promptEl.remove();
+      try {
+        await screen.orientation?.lock?.("landscape");
+      } catch {
+        if (document.fullscreenElement === wrap) {
+          await document.exitFullscreen?.().catch(() => {});
+        }
+        wrap.classList.add("is-pseudo-fs", "is-landscape-rot");
+      }
+    });
+
+    promptEl.querySelector('[data-orient="no"]')?.addEventListener("click", async () => {
+      promptEl.remove();
+      wrap.classList.remove("is-landscape-rot");
+      try {
+        await screen.orientation?.lock?.("portrait");
+      } catch {}
+    });
+  };
+
+  const exitAllFullscreen = () => {
+    wrap.querySelector(".bp-fs-orient-prompt")?.remove();
+    wrap.classList.remove("is-pseudo-fs", "is-landscape-rot");
+    try {
+      screen.orientation?.unlock?.();
+    } catch {}
+    if (document.fullscreenElement === wrap) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  };
+
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement && !wrap.classList.contains("is-pseudo-fs")) {
+      wrap.querySelector(".bp-fs-orient-prompt")?.remove();
+      wrap.classList.remove("is-landscape-rot");
+      try {
+        screen.orientation?.unlock?.();
+      } catch {}
+    }
+  });
+
   fsBtn.addEventListener("click", () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.().catch(() => { });
-    } else if (wrap.requestFullscreen) {
-      wrap.requestFullscreen().catch(() => videoEl.webkitEnterFullscreen?.());
+    if (document.fullscreenElement === wrap || wrap.classList.contains("is-pseudo-fs")) {
+      exitAllFullscreen();
+      return;
+    }
+    if (wrap.requestFullscreen) {
+      wrap.requestFullscreen()
+        .then(() => showLandscapePrompt())
+        .catch(() => {
+          wrap.classList.add("is-pseudo-fs");
+          showLandscapePrompt();
+        });
     } else {
-      videoEl.webkitEnterFullscreen?.();
+      wrap.classList.add("is-pseudo-fs");
+      showLandscapePrompt();
     }
   });
 
@@ -3522,7 +3690,7 @@ if (bpIntroEl) {
         applyTheme(next);
       },
       getThemeLabel: () => (document.documentElement.dataset.theme === "dark" ? "DARK" : "LIGHT"),
-      onScanFolder: (folderPath) => scanDeviceBlackpageFolder(folderPath),
+      onScanFolder: (folderPath, onProgress) => scanDeviceBlackpageFolder(folderPath, onProgress),
       onScanWebFiles: (fileList) => scanWebFileList(fileList),
       onSyncFolder: (scanResult) => syncScannedFolderData(scanResult),
       onFinish: () => {

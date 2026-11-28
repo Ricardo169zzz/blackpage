@@ -89,18 +89,49 @@ export function mountOnboarding(container, {
   let selectedStyle = INTRO_STYLES.some((s) => s.id === prefs.introStyle)
     ? prefs.introStyle
     : "bauhaus";
-  let scanState = { loading: false, data: null, syncedMsg: "", customOpen: false };
+  let scanState = {
+    loading: false,
+    scanningDir: "",
+    data: null,
+    syncedMsg: "",
+    customOpen: false,
+    customInput: "Download/Blackpage",
+  };
 
   const TOTAL = 6;
 
-  async function runAutoScan(folderPath = "Download/Blackpage") {
+  async function runAutoScan(folderPath = "Download/Blackpage", autoSync = true) {
     if (!onScanFolder) return;
     scanState.loading = true;
+    scanState.scanningDir = folderPath;
+    scanState.syncedMsg = "";
+    scanState.customInput = folderPath;
     if (step === 6) render();
     try {
-      scanState.data = await onScanFolder(folderPath);
-    } catch {
-      scanState.data = null;
+      const res = await onScanFolder(folderPath, (prog) => {
+        scanState.scanningDir = prog?.scanningDir || folderPath;
+        const dirEl = container.querySelector("#bpoScanDirText");
+        if (dirEl) dirEl.textContent = `MEMINDAI: ${scanState.scanningDir}`;
+      });
+      scanState.data = res;
+      if (autoSync && res?.totalCount > 0 && onSyncFolder) {
+        const synced = await onSyncFolder(res);
+        const parts = [];
+        if (synced?.backupRestored) parts.push("backup JSON dipulihkan");
+        if (synced?.addedCount) parts.push(`${synced.addedCount} file ditambahkan`);
+        scanState.syncedMsg = parts.length
+          ? `✓ Tersinkron otomatis (${parts.join(" & ")})`
+          : "✓ Folder sudah tersinkron otomatis.";
+      }
+    } catch (err) {
+      scanState.data = {
+        platform: "android",
+        folder: folderPath,
+        totalCount: 0,
+        counts: { video: 0, audio: 0, thumb: 0, image: 0, backup: 0 },
+        entries: [],
+        error: err?.message || "Gagal memindai folder.",
+      };
     }
     scanState.loading = false;
     if (step === 6) render();
@@ -361,10 +392,15 @@ export function mountOnboarding(container, {
         const scan = scanState.data;
         const hasPrevData = Boolean(scan && scan.totalCount > 0);
         const isAndroid = scan?.platform === "android";
+        const c = scan?.counts || { video: 0, audio: 0, thumb: 0, image: 0, backup: 0 };
 
         const previewRows = hasPrevData
           ? scan.entries.slice(0, 6).map((item) => {
-            const icon = item.kind === "backup" ? "JSON" : item.kind === "audio" ? "MP3" : item.kind === "video" ? "MP4" : "IMG";
+            const icon =
+              item.kind === "backup" ? "JSON" :
+              item.kind === "audio" ? "MP3" :
+              item.kind === "video" ? "MP4" :
+              item.kind === "thumb" ? "THM" : "IMG";
             return `
               <div class="bpo-sync-item">
                 <span class="bpo-sync-kind">${icon}</span>
@@ -374,33 +410,51 @@ export function mountOnboarding(container, {
           }).join("")
           : "";
 
+        const countsStrip = hasPrevData
+          ? `
+            <div class="bpo-scan-counts">
+              <span>VID ${c.video || 0}</span>
+              <span>AUD ${c.audio || 0}</span>
+              <span>THM ${c.thumb || 0}</span>
+              <span>IMG ${c.image || 0}</span>
+              <span>JSON ${c.backup || 0}</span>
+            </div>
+          `
+          : "";
+
         const syncHtml = scanState.loading
-          ? `<div class="bpo-sync-box bpo-wipe" style="--st:3"><span class="bpo-mono-tag">MEMINDAI FOLDER DOWNLOAD/BLACKPAGE...</span></div>`
+          ? `
+            <div class="bpo-sync-box bpo-wipe" style="--st:3">
+              <div class="bpo-sync-title">Memindai penyimpanan perangkat...</div>
+              <div class="bpo-sync-folder" id="bpoScanDirText">MEMINDAI: ${scanState.scanningDir || "Download/Blackpage"}</div>
+              <div class="bpo-scan-bar"><span class="bpo-scan-bar-fill"></span></div>
+            </div>
+          `
           : hasPrevData
             ? `
               <div class="bpo-sync-box bpo-wipe" style="--st:3">
                 <div class="bpo-sync-title">Di perangkat ini sudah ada data aplikasi versi sebelumnya, ingin sinkronkan?</div>
                 <div class="bpo-sync-folder">📁 ${scan.folder} (${scan.totalCount} file)</div>
+                ${countsStrip}
                 <div class="bpo-sync-list">
                   ${previewRows}
                   ${scan.totalCount > 6 ? `<div class="bpo-sync-more">+${scan.totalCount - 6} file lainnya</div>` : ""}
                 </div>
-                ${scanState.syncedMsg
-                  ? `<div class="bpo-sync-done">${scanState.syncedMsg}</div>`
-                  : `
-                    <div class="bpo-sync-actions">
-                      <button type="button" class="bpo-sync-btn is-primary" id="bpoSyncNowBtn">SINKRONKAN</button>
-                      <button type="button" class="bpo-sync-btn" id="bpoPickFolderBtn">PILIH FOLDER</button>
-                    </div>
-                  `}
+                ${scanState.syncedMsg ? `<div class="bpo-sync-done">${scanState.syncedMsg}</div>` : ""}
+                <div class="bpo-sync-actions">
+                  ${!scanState.syncedMsg ? `<button type="button" class="bpo-sync-btn is-primary" id="bpoSyncNowBtn">SINKRONKAN</button>` : ""}
+                  <button type="button" class="bpo-sync-btn" id="bpoPickFolderBtn">PILIH FOLDER</button>
+                </div>
               </div>
             `
             : `
               <div class="bpo-sync-box bpo-wipe" style="--st:3">
                 <div class="bpo-sync-title">Tidak ada data sebelumnya? Pilih folder milikmu</div>
+                ${scan?.error ? `<div class="bpo-sync-err">${scan.error}</div>` : ""}
                 ${scanState.syncedMsg ? `<div class="bpo-sync-done">${scanState.syncedMsg}</div>` : ""}
                 <div class="bpo-sync-actions">
-                  <button type="button" class="bpo-sync-btn" id="bpoPickFolderBtn">PILIH FOLDER MILIKMU</button>
+                  <button type="button" class="bpo-sync-btn is-primary" id="bpoPickFolderBtn">PILIH FOLDER MILIKMU</button>
+                  ${isAndroid ? `<button type="button" class="bpo-sync-btn" id="bpoRescanDefaultBtn">PINDAI ULANG</button>` : ""}
                 </div>
               </div>
             `;
@@ -408,7 +462,7 @@ export function mountOnboarding(container, {
         const customFolderHtml = scanState.customOpen && isAndroid
           ? `
             <div class="bpo-custom-folder">
-              <input type="text" class="bpo-folder-input" id="bpoCustomFolderInput" value="${scan?.folder || "Download/Blackpage"}" placeholder="Contoh: Download/Blackpage" />
+              <input type="text" class="bpo-folder-input" id="bpoCustomFolderInput" value="${scanState.customInput || scan?.folder || "Download/Blackpage"}" placeholder="Contoh: Download/Blackpage" />
               <button type="button" class="bpo-sync-btn is-primary" id="bpoScanCustomBtn">PINDAI</button>
             </div>
           `
@@ -542,16 +596,30 @@ export function mountOnboarding(container, {
       }
     });
 
-    container.querySelector("#bpoScanCustomBtn")?.addEventListener("click", () => {
-      const val = container.querySelector("#bpoCustomFolderInput")?.value?.trim();
-      if (val) runAutoScan(val);
+    container.querySelector("#bpoRescanDefaultBtn")?.addEventListener("click", () => {
+      runAutoScan(scanState.customInput || "Download/Blackpage", true);
     });
 
-    container.querySelector("#bpoWebFolderInput")?.addEventListener("change", (e) => {
+    container.querySelector("#bpoScanCustomBtn")?.addEventListener("click", () => {
+      const val = container.querySelector("#bpoCustomFolderInput")?.value?.trim();
+      if (val) runAutoScan(val, true);
+    });
+
+    container.querySelector("#bpoWebFolderInput")?.addEventListener("change", async (e) => {
       const files = e.target?.files;
       if (!files?.length || !onScanWebFiles) return;
-      scanState.data = onScanWebFiles(files);
+      const webRes = onScanWebFiles(files);
+      scanState.data = webRes;
       scanState.syncedMsg = "";
+      if (webRes?.totalCount > 0 && onSyncFolder) {
+        const synced = await onSyncFolder(webRes);
+        const parts = [];
+        if (synced?.backupRestored) parts.push("backup JSON dipulihkan");
+        if (synced?.addedCount) parts.push(`${synced.addedCount} file ditambahkan`);
+        scanState.syncedMsg = parts.length
+          ? `✓ Tersinkron otomatis (${parts.join(" & ")})`
+          : "✓ Folder sudah tersinkron otomatis.";
+      }
       render();
     });
 
