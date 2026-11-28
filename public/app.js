@@ -2,6 +2,8 @@ import { downloadMediaFile, renderProgressHtml, resolveOfflineThumbSrc, cacheOff
 import { createMusicPlayer } from "./tools/music-player.js";
 import { createBgEffects } from "./tools/bg-effects.js";
 import { quranTool } from "./tools/quran.js";
+import { mountAnimeApp } from "./tools/anime.js";
+import { mountOnboarding, renderSplashMarkup } from "./tools/intro.js";
 
 const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
@@ -24,6 +26,8 @@ const DEFAULT_PREFS = {
   audioFolder: "Download/Blackpage/audio",
   autoRetry: true,
   maxRetry: 3,
+  introStyle: "bauhaus",
+  onboardingDone: false,
 };
 
 export function getPrefs() {
@@ -308,6 +312,8 @@ let galleryFilter = "MEDIA"; // "MEDIA" | "MUSIC"
 let hasPlayedHomeStagger = false;
 let activeStageAnim = null;
 let comicController = null;
+let animeController = null;
+let animeNavTab = "ongoing";
 
 const navEl = document.getElementById("toolNav");
 const stageEl = document.getElementById("toolStage");
@@ -641,7 +647,7 @@ function applyMotionPref() {
 
 const TAB_ORDER = { home: 0, tools: 1, music: 2, gallery: 3, settings: 4 };
 const isSubPage = (p) =>
-  p === "comic" || p.startsWith("tool:") || p.startsWith("gallery:") || p.startsWith("settings:");
+  p === "comic" || p === "anime" || p.startsWith("tool:") || p.startsWith("gallery:") || p.startsWith("settings:");
 
 function playPageEnter() {
   if (getPrefs().reduceMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -698,10 +704,47 @@ const NAV_ICONS = {
   settings: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2" fill="var(--surface)"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2" fill="var(--surface)"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="10" cy="18" r="2" fill="var(--surface)"/></svg>`,
 };
 
+const ANIME_NAV_ICONS = {
+  ongoing: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg>`,
+  search: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.5" y2="16.5"/></svg>`,
+  downloads: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  history: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>`,
+  exit: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+};
+
 function renderNav() {
   if (activePage !== "home") {
     stageEl.classList.remove("home-stagger", "is-waiting", "is-entering");
   }
+
+  if (activePage === "anime") {
+    navEl.classList.add("is-anime-nav");
+    navEl.innerHTML = `
+      <button class="nav-btn ${animeNavTab === "ongoing" ? "active" : ""}" data-anime-nav="ongoing">
+        ${ANIME_NAV_ICONS.ongoing}
+        <span>Ongoing</span>
+      </button>
+      <button class="nav-btn ${animeNavTab === "search" ? "active" : ""}" data-anime-nav="search">
+        ${ANIME_NAV_ICONS.search}
+        <span>${getLang() === "en" ? "Search" : "Cari"}</span>
+      </button>
+      <button class="nav-btn ${animeNavTab === "downloads" ? "active" : ""}" data-anime-nav="downloads">
+        ${ANIME_NAV_ICONS.downloads}
+        <span>Download</span>
+      </button>
+      <button class="nav-btn ${animeNavTab === "history" ? "active" : ""}" data-anime-nav="history">
+        ${ANIME_NAV_ICONS.history}
+        <span>${getLang() === "en" ? "History" : "Riwayat"}</span>
+      </button>
+      <button class="nav-btn" data-anime-nav="exit">
+        ${ANIME_NAV_ICONS.exit}
+        <span>${getLang() === "en" ? "Exit" : "Keluar"}</span>
+      </button>
+    `;
+    return;
+  }
+
+  navEl.classList.remove("is-anime-nav");
   const isHome = activePage === "home";
   const isTools = activePage === "tools" || activePage.startsWith("tool:");
   const isMusic = activePage === "music";
@@ -839,6 +882,17 @@ function renderHome(fromPopstate = false) {
       <span class="tag comic-hero-pill">${getLang() === "en" ? "OPEN &rarr;" : "BUKA &rarr;"}</span>
     </button>
 
+    <button type="button" class="comic-hero-btn anime-hero-btn" id="openAnimeBtn">
+      <span class="comic-hero-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+      </span>
+      <span class="comic-hero-text">
+        <strong>${getLang() === "en" ? "WATCH ANIME" : "NONTON ANIME"}</strong>
+        <small>${getLang() === "en" ? "Ongoing &amp; Sub Indo Streaming" : "Streaming Anime Sub Indo Terbaru"}</small>
+      </span>
+      <span class="tag comic-hero-pill">${getLang() === "en" ? "OPEN &rarr;" : "BUKA &rarr;"}</span>
+    </button>
+
     <div class="panel-card">
       <div class="support-head" style="border-top:0;padding-top:0;">
         <div class="field-label" style="margin:0;">SUPPORT TOOLS</div>
@@ -862,6 +916,28 @@ function renderHome(fromPopstate = false) {
 
   initUniversalBox(stageEl, { API_BASE: getApiBase(), escapeHtml, prefs: getPrefs() });
   stageEl.querySelector("#openComicBtn")?.addEventListener("click", () => mountComicPage());
+  stageEl.querySelector("#openAnimeBtn")?.addEventListener("click", () => mountAnimePage());
+}
+
+function mountAnimePage(fromPopstate = false) {
+  activePage = "anime";
+  animeNavTab = "ongoing";
+  pushRoute("anime", fromPopstate);
+  renderNav();
+  stageEl.classList.remove("stage-split");
+  animeController = mountAnimeApp(stageEl, {
+    API_BASE: getApiBase(),
+    escapeHtml,
+    upgradeVideoPlayer,
+    onRouteChange: (v) => {
+      if (v === "ongoing" || v === "search" || v === "downloads" || v === "history") {
+        animeNavTab = v;
+        renderNav();
+      }
+    },
+    onExit: () => renderHome(),
+  });
+  playPageEnter();
 }
 
 function mountComicPage(fromPopstate = false) {
@@ -2748,6 +2824,7 @@ audioMo.observe(stageEl, { childList: true, subtree: true });
 function navigate(page, fromPopstate = false) {
   document.querySelectorAll(".comic-float-back, .comic-as-float, .comic-top-float-back").forEach((n) => n.remove());
   if (page !== "comic") comicController = null;
+  if (page !== "anime") animeController = null;
   const ws = stageEl.closest(".workspace");
   if (ws && ws.scrollTop > 0) {
     const reduce = getPrefs().reduceMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -2759,6 +2836,7 @@ function navigate(page, fromPopstate = false) {
   else if (page === "gallery") renderGallery(fromPopstate);
   else if (page === "settings") renderSettings(fromPopstate);
   else if (page === "comic") mountComicPage(fromPopstate);
+  else if (page === "anime") mountAnimePage(fromPopstate);
   else if (page.startsWith("tool:")) mountTool(page.slice(5), "", fromPopstate);
   else if (page.startsWith("gallery:")) renderGalleryDetail(Number(page.slice(8)), fromPopstate);
   else if (page === "settings:tampilan:bg") renderBgEffectSettings(fromPopstate);
@@ -3033,6 +3111,9 @@ window.Capacitor?.Plugins?.App?.addListener?.("backButton", () => {
     modal.remove();
     return;
   }
+  if (activePage === "anime" && animeController?.handleBack()) {
+    return;
+  }
   if (activePage !== "home") {
     history.back();
     return;
@@ -3059,6 +3140,11 @@ window.Capacitor?.Plugins?.App?.addListener?.("backButton", () => {
 });
 
 navEl.addEventListener("click", (e) => {
+  const animeBtn = e.target.closest("[data-anime-nav]");
+  if (animeBtn && animeController) {
+    animeController.switchNav(animeBtn.dataset.animeNav);
+    return;
+  }
   const btn = e.target.closest("[data-page]");
   if (btn) navigate(btn.dataset.page);
 });
@@ -3220,9 +3306,11 @@ checkHealth();
 
 const bpIntroEl = document.getElementById("bpIntro");
 if (bpIntroEl) {
-  const reduce = getPrefs().reduceMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  setTimeout(
-    () => {
+  const prefs = getPrefs();
+  const reduce = prefs.reduceMotion || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const finishIntro = (delayMs) => {
+    setTimeout(() => {
       bpIntroEl.classList.add("is-exit");
       if (activePage === "home" && stageEl.classList.contains("is-waiting")) {
         stageEl.classList.remove("is-waiting");
@@ -3231,8 +3319,29 @@ if (bpIntroEl) {
       setTimeout(() => {
         bpIntroEl.remove();
         stageEl.classList.remove("home-stagger", "is-entering");
-      }, 900);
-    },
-    reduce ? 50 : 1400
-  );
+      }, 650);
+    }, delayMs);
+  };
+
+  if (!prefs.onboardingDone) {
+    bpIntroEl.removeAttribute("aria-hidden");
+    mountOnboarding(bpIntroEl, {
+      prefs,
+      githubUser: "Ricardo169zzz",
+      githubRepo: GITHUB_REPO,
+      appVersion: APP_VERSION,
+      onSavePrefs: (patch) => savePrefs({ ...getPrefs(), ...patch }),
+      onToggleTheme: () => {
+        const current = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+        const next = current === "dark" ? "light" : "dark";
+        localStorage.setItem(THEME_KEY, next);
+        applyTheme(next);
+      },
+      getThemeLabel: () => (document.documentElement.dataset.theme === "dark" ? "DARK" : "LIGHT"),
+      onFinish: () => finishIntro(60),
+    });
+  } else {
+    bpIntroEl.innerHTML = renderSplashMarkup(prefs.introStyle || "bauhaus");
+    finishIntro(reduce ? 50 : 1250);
+  }
 }

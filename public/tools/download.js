@@ -22,13 +22,24 @@ export async function cacheOfflineThumb(API_BASE, thumbUrl, thumbFilename = "") 
   const fs = cap?.Plugins?.Filesystem;
   if (cap?.isNativePlatform?.() && fs && thumbFilename) {
     try {
-      await fs.mkdir({ path: "Download/Blackpage/thumb", directory: "EXTERNAL_STORAGE", recursive: true }).catch(() => {});
+      await fs.mkdir({ path: "thumbs", directory: "DATA", recursive: true }).catch(() => {});
       await fs.downloadFile({
         url: proxyUrl,
-        path: `Download/Blackpage/thumb/${thumbFilename}`,
-        directory: "EXTERNAL_STORAGE",
+        path: `thumbs/${thumbFilename}`,
+        directory: "DATA",
+        recursive: true,
       });
-    } catch {}
+    } catch {
+      try {
+        await fs.mkdir({ path: "Download/Blackpage/thumb", directory: "EXTERNAL_STORAGE", recursive: true }).catch(() => {});
+        await fs.downloadFile({
+          url: proxyUrl,
+          path: `Download/Blackpage/thumb/${thumbFilename}`,
+          directory: "EXTERNAL_STORAGE",
+          recursive: true,
+        });
+      } catch {}
+    }
   }
   if (typeof caches !== "undefined") {
     try {
@@ -43,13 +54,17 @@ export async function resolveOfflineThumbSrc(API_BASE, item) {
   const cap = window.Capacitor;
   const fs = cap?.Plugins?.Filesystem;
   if (cap?.isNativePlatform?.() && fs && item.thumbFilename) {
-    const path = `Download/Blackpage/thumb/${item.thumbFilename}`;
-    try {
-      await fs.stat({ path, directory: "EXTERNAL_STORAGE" });
-      const res = await fs.getUri({ path, directory: "EXTERNAL_STORAGE" });
-      const uri = res?.uri || "";
-      if (uri) return typeof cap.convertFileSrc === "function" ? cap.convertFileSrc(uri) : uri;
-    } catch {}
+    for (const [dir, path] of [
+      ["DATA", `thumbs/${item.thumbFilename}`],
+      ["EXTERNAL_STORAGE", `Download/Blackpage/thumb/${item.thumbFilename}`],
+    ]) {
+      try {
+        await fs.stat({ path, directory: dir });
+        const res = await fs.getUri({ path, directory: dir });
+        const uri = res?.uri || "";
+        if (uri) return typeof cap.convertFileSrc === "function" ? cap.convertFileSrc(uri) : uri;
+      } catch {}
+    }
   }
   if (typeof caches !== "undefined" && item.thumbnail) {
     try {

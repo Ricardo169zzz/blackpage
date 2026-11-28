@@ -5035,3 +5035,1385 @@ body::before {
   min-width: 40px;
   font-weight: 800;
 }
+
+/* Nonton Anime Hero Banner (Light & Dark) & Streaming UI */
+.anime-hero-btn {
+  background-image:
+    linear-gradient(90deg, rgba(20, 20, 22, 0.84) 0%, rgba(20, 20, 22, 0.52) 58%, rgba(20, 20, 22, 0.3) 100%),
+    url("./anime-banner-light.jpg?v=140");
+}
+
+[data-theme="dark"] .anime-hero-btn {
+  background-image:
+    linear-gradient(90deg, rgba(16, 16, 20, 0.88) 0%, rgba(16, 16, 20, 0.56) 58%, rgba(16, 16, 20, 0.34) 100%),
+    url("./anime-banner-dark.jpg?v=140");
+}
+
+.tool-nav.is-anime-nav {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  animation: bpPopIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.tool-nav.is-anime-nav .tool-nav-btn {
+  transition: transform 0.14s var(--ease), background-color 0.16s ease, color 0.16s ease;
+}
+
+.tool-nav.is-anime-nav .tool-nav-btn:active {
+  transform: scale(0.93);
+}
+
+.bp-anime-stage .stage-head,
+.bp-anime-stage .tool-topbar,
+.bp-anime-stage .bp-sp-search-row {
+  animation: bpStaggerIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bp-anime-stage .bp-sp-search-row {
+  animation-delay: 45ms;
+}
+
+.bp-anime-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bp-anime-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+  animation: bpPopIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 24ms);
+  transition: transform 0.14s var(--ease);
+}
+
+.bp-anime-card:active {
+  transform: scale(0.96);
+}
+
+.bp-anime-poster-wrap {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  background: var(--paper-alt);
+  overflow: hidden;
+  border-bottom: 1.5px solid var(--ink);
+}
+
+.bp-anime-poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transform: scale(1.03);
+  transition: opacity 0.24s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.bp-anime-poster.is-loaded {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.bp-anime-poster-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.bp-anime-ep-badge {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  padding: 2px 6px;
+  background: rgba(20, 20, 22, 0.86);
+  color: #faf7f0;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 800;
+  animation: bpPopIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bp-anime-card-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bp-anime-title {
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bp-anime-sub {
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+
+.bp-anime-detail-head {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  animation: bpStaggerIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bp-anime-detail-poster {
+  width: 92px;
+  height: 126px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border: 2px solid var(--ink);
+  animation: bpPopIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bp-anime-detail-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.bp-anime-info-line {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-bottom: 2px;
+  animation: bpStaggerIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 50ms;
+}
+
+.bp-anime-synopsis {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--muted);
+  animation: bpStaggerIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) 70ms both;
+}
+
+.bp-anime-ep-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bp-anime-ep-list .bp-quran-surah-row {
+  animation: bpStaggerIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--ep-i, 0) * 18ms);
+  transition: transform 0.14s var(--ease);
+}
+
+.bp-anime-ep-list .bp-quran-surah-row:active {
+  transform: scale(0.98);
+}
+
+.bp-anime-iframe-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 2px solid var(--ink);
+  overflow: hidden;
+  animation: bpPopIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bp-anime-iframe-wrap iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.bp-anime-stage .video-preview {
+  animation: bpPopIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bp-anime-ep-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  animation: bpStaggerIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+}
+
+.bp-anime-ep-nav .btn,
+.bp-anime-stage .dl-list .btn,
+.bp-anime-stage .bp-quran-page-btn {
+  transition: transform 0.14s var(--ease);
+}
+
+.bp-anime-ep-nav .btn:active,
+.bp-anime-stage .dl-list .btn:active,
+.bp-anime-stage .bp-quran-page-btn:active {
+  transform: scale(0.95);
+}
+
+.bp-anime-stage .dl-list .btn {
+  animation: bpPopIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) 80ms both;
+}
+
+.bp-anime-stage .bp-quran-pager,
+.bp-anime-stage .alert {
+  animation: bpPopIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bp-anime-cat-sec {
+  margin-bottom: 14px;
+  animation: bpStaggerIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--cat-i, 0) * 45ms);
+}
+
+.bp-anime-cat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.bp-anime-cat-head strong {
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bp-anime-cat-more {
+  min-width: 30px;
+  font-weight: 800;
+  transition: transform 0.14s var(--ease);
+}
+
+.bp-anime-cat-more:active {
+  transform: translate3d(2px, 0, 0) scale(0.94);
+}
+
+.bp-anime-hscroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bp-anime-hcard {
+  flex: 0 0 118px;
+  width: 118px;
+  scroll-snap-align: start;
+}
+
+.bp-anime-dl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  animation: bpStaggerIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--ep-i, 0) * 18ms);
+}
+
+.bp-anime-dl-thumb {
+  width: 48px;
+  height: 64px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border: 1.5px solid var(--ink);
+  background: var(--paper-alt);
+}
+
+.bp-anime-dl-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bp-anime-dl-meta strong {
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bp-anime-dl-meta small {
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bp-anime-dl-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-nav.is-anime-nav,
+  .bp-anime-stage .stage-head,
+  .bp-anime-stage .tool-topbar,
+  .bp-anime-stage .bp-sp-search-row,
+  .bp-anime-card,
+  .bp-anime-ep-badge,
+  .bp-anime-detail-head,
+  .bp-anime-detail-poster,
+  .bp-anime-info-line,
+  .bp-anime-synopsis,
+  .bp-anime-ep-list .bp-quran-surah-row,
+  .bp-anime-iframe-wrap,
+  .bp-anime-stage .video-preview,
+  .bp-anime-ep-nav,
+  .bp-anime-stage .dl-list .btn,
+  .bp-anime-stage .bp-quran-pager,
+  .bp-anime-stage .alert,
+  .bp-anime-cat-sec {
+    animation: none !important;
+  }
+
+  .bp-anime-poster {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* =====================================================================
+   BLACKPAGE ONBOARDING (6-STEP) & 3-STYLE ENTRANCE SPLASH
+   ===================================================================== */
+:root {
+  --bp-paper: #F2EDE2;
+  --bp-surface: #FAF7F0;
+  --bp-ink: #141414;
+  --bp-muted: #5C5852;
+  --bp-red: #D93829;
+  --bp-blue: #1D569E;
+  --bp-yellow: #F2B705;
+}
+
+:root[data-theme="dark"] {
+  --bp-paper: #121214;
+  --bp-surface: #1B1B1F;
+  --bp-ink: #F2EFE9;
+  --bp-muted: #9E9B95;
+  --bp-red: #E0483E;
+  --bp-blue: #3B7DD8;
+  --bp-yellow: #F2B705;
+}
+
+.bp-intro {
+  background: var(--bp-paper);
+  color: var(--bp-ink);
+  display: block;
+}
+
+/* --- 6-Step Manga Editorial Shell (Full-Width Mobile, Screentone Gutter) --- */
+.bpo-shell {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bp-paper);
+  background-image: radial-gradient(color-mix(in srgb, var(--bp-ink) 8%, transparent) 0.75px, transparent 0.75px);
+  background-size: 12px 12px;
+  color: var(--bp-ink);
+  padding:
+    calc(14px + env(safe-area-inset-top, 0px))
+    16px
+    calc(14px + env(safe-area-inset-bottom, 0px));
+  overflow: hidden;
+}
+
+.bpo-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--bp-ink);
+}
+
+.bpo-step-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.bpo-step-count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.bpo-progress-bars {
+  display: flex;
+  gap: 4px;
+}
+
+.bpo-pbar {
+  width: 18px;
+  height: 4px;
+  background: color-mix(in srgb, var(--bp-ink) 18%, transparent);
+  transition: background 0.25s ease;
+}
+
+.bpo-pbar.is-done {
+  background: var(--bp-red);
+}
+
+.bpo-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bpo-top-btn {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 6px 10px;
+  background: var(--bp-surface);
+  color: var(--bp-ink);
+  border: 2px solid var(--bp-ink);
+  cursor: pointer;
+}
+
+.bpo-skip-btn {
+  background: transparent;
+}
+
+.bpo-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 0 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bpo-step {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 16px;
+}
+
+.bpo-step-body {
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 12px;
+}
+
+/* Tactile Editorial Text Animations (Slice, Wipe, Rule-Draw, Pop) */
+.bpo-line-mask {
+  overflow: hidden;
+  display: block;
+}
+
+.bpo-slice {
+  display: block;
+  opacity: 0;
+  transform: translate3d(0, 108%, 0) skewY(2.5deg);
+  animation: bpoSliceIn 0.56s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--st, 0) * 70ms) forwards;
+  will-change: transform, opacity;
+}
+
+.bpo-wipe {
+  opacity: 0;
+  clip-path: inset(0 0 100% 0);
+  transform: translate3d(0, 8px, 0);
+  animation: bpoWipeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--st, 0) * 65ms) forwards;
+  will-change: clip-path, transform, opacity;
+}
+
+.bpo-rule {
+  width: 100%;
+  height: 2px;
+  background: var(--bp-ink);
+}
+
+.bpo-rule-draw {
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: bpoRuleDraw 0.52s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--st, 0) * 60ms) forwards;
+  will-change: transform;
+}
+
+.bpo-pop {
+  opacity: 0;
+  transform: translate3d(-10px, 0, 0) scale(0.92);
+  animation: bpoPopSnap 0.48s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--st, 0) * 70ms) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes bpoSliceIn {
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) skewY(0deg);
+  }
+}
+
+@keyframes bpoWipeIn {
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes bpoRuleDraw {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes bpoPopSnap {
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.bpo-manga-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bpo-ch-badge {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  background: var(--bp-ink);
+  color: var(--bp-paper);
+}
+
+.bpo-mono-tag {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--bp-muted);
+}
+
+/* Step 1: Manga Cover + Crop Registration Marks */
+.bpo-cover-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.bpo-crop-frame {
+  position: relative;
+  width: 100%;
+  padding: 16px;
+}
+
+.bpo-crop {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: var(--bp-ink);
+  border-style: solid;
+  border-width: 0;
+}
+.bpo-crop--tl { top: 0; left: 0; border-top-width: 2.5px; border-left-width: 2.5px; }
+.bpo-crop--tr { top: 0; right: 0; border-top-width: 2.5px; border-right-width: 2.5px; }
+.bpo-crop--bl { bottom: 0; left: 0; border-bottom-width: 2.5px; border-left-width: 2.5px; }
+.bpo-crop--br { bottom: 0; right: 0; border-bottom-width: 2.5px; border-right-width: 2.5px; }
+
+.bpo-cover-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 18px;
+  background: var(--bp-surface);
+  border: 2.5px solid var(--bp-ink);
+  box-shadow: 6px 6px 0 var(--bp-ink);
+}
+
+.bpo-logo-box {
+  display: inline-flex;
+}
+
+.bpo-cover-vert {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  color: var(--bp-red);
+}
+
+.bpo-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bpo-foot-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.bpo-foot-caption p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--bp-muted);
+}
+
+.bpo-seal {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--bp-ink);
+  background: var(--bp-surface);
+  padding: 3px;
+  display: grid;
+  place-items: center;
+}
+
+.bpo-seal img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.bpo-hero-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bpo-bottom-block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bpo-m-num {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--bp-red);
+  width: 20px;
+  flex: 0 0 20px;
+}
+
+/* Step 4: Epic Creator GitHub Dossier */
+.bpo-dossier {
+  background: var(--bp-surface);
+  border: 2.5px solid var(--bp-ink);
+  box-shadow: 6px 6px 0 var(--bp-ink);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.bpo-dossier-banner {
+  background: var(--bp-ink);
+  color: var(--bp-paper);
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.bpo-dossier-stamp {
+  padding: 2px 6px;
+  border: 1.5px solid var(--bp-red);
+  color: var(--bp-red);
+  font-size: 9.5px;
+}
+
+.bpo-dossier-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 14px 14px;
+}
+
+.bpo-dossier-avatar-frame {
+  position: relative;
+  width: 82px;
+  height: 82px;
+  flex: 0 0 82px;
+  border: 2.5px solid var(--bp-ink);
+  background: var(--bp-paper);
+}
+
+.bpo-hanko {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  padding: 2px 5px;
+  background: var(--bp-red);
+  color: #FAF7F0;
+  border: 2px solid var(--bp-ink);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.bpo-dossier-id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bpo-dev-handle {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.bpo-dossier-quote {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.bpo-quote-bar {
+  width: 3px;
+  flex: 0 0 3px;
+  background: var(--bp-red);
+}
+
+.bpo-dossier-quote p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bp-muted);
+  font-style: italic;
+}
+
+.bpo-dossier-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 2px solid var(--bp-ink);
+}
+
+.bpo-dstat {
+  padding: 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1.5px solid color-mix(in srgb, var(--bp-ink) 22%, transparent);
+}
+
+.bpo-dstat:last-child {
+  border-right: none;
+}
+
+.bpo-dstat span {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--bp-muted);
+}
+
+.bpo-dstat strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bpo-h1 {
+  font-size: clamp(2.1rem, 9.5vw, 2.75rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 0.96;
+  margin: 0;
+}
+
+/* Display & Headings */
+.bpo-display {
+  font-size: clamp(1.9rem, 8.2vw, 2.4rem);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.bpo-h2 {
+  font-size: clamp(1.35rem, 6vw, 1.65rem);
+  font-weight: 800;
+  line-height: 1.18;
+  margin: 0;
+}
+
+.bpo-lead {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--bp-muted);
+  margin: 0;
+}
+
+/* Step 2: Open Typographic List (Zero Unnecessary Cards) */
+.bpo-clean-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bpo-clean-list li {
+  padding-left: 12px;
+  border-left: 3px solid var(--bp-red);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bpo-clean-list strong {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+
+.bpo-clean-list span {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bp-muted);
+}
+
+/* Step 3 & 6: Manga Mokuji (Table of Contents, No Cards) */
+.bpo-mokuji {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 8px 0;
+}
+
+.bpo-mokuji-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.bpo-m-title {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bpo-m-dots {
+  flex: 1 1 auto;
+  border-bottom: 1.5px dotted color-mix(in srgb, var(--bp-ink) 40%, transparent);
+  transform: translateY(-3px);
+}
+
+.bpo-m-tag {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--bp-muted);
+  white-space: nowrap;
+}
+
+/* Step 4: Manga Author Colophon */
+.bpo-author-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  background: var(--bp-surface);
+  border: 2.5px solid var(--bp-ink);
+  box-shadow: 5px 5px 0 var(--bp-ink);
+}
+
+.bpo-dev-avatar-wrap {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  border: 2px solid var(--bp-ink);
+  background: var(--bp-paper);
+  overflow: hidden;
+}
+
+.bpo-dev-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.bpo-dev-fallback {
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  font-size: 26px;
+  font-weight: 800;
+  background: var(--bp-red);
+  color: #FAF7F0;
+}
+
+.bpo-dev-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bpo-dev-name {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.bpo-dev-role {
+  font-size: 12.5px;
+  color: var(--bp-muted);
+}
+
+.bpo-dev-repo {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bp-blue);
+  word-break: break-all;
+}
+
+.bpo-gh-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--bp-surface);
+  color: var(--bp-ink);
+  border: 2px solid var(--bp-ink);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Step 5: 3 Cards (9:16) + 3 Horizontal Style Buttons Below */
+.bpo-cards-916 {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.bpo-card-916 {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  background: var(--bp-surface);
+  border: 2px solid var(--bp-ink);
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.62;
+  transform: scale(0.96);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease, box-shadow 0.25s ease;
+}
+
+.bpo-card-916.is-selected {
+  opacity: 1;
+  transform: scale(1);
+  border-width: 2.5px;
+  box-shadow: 4px 4px 0 var(--bp-ink);
+}
+
+.bpo-card-num {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 5;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 5px;
+  background: var(--bp-ink);
+  color: var(--bp-paper);
+}
+
+.bpo-card-stage {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.bpo-card-stage .bp-splash {
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
+
+.bp-splash {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0 12px;
+}
+
+.bpo-style-btns {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bpo-style-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 10px;
+  background: var(--bp-surface);
+  color: var(--bp-ink);
+  border: 2px solid var(--bp-ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.bpo-style-btn span {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.68;
+}
+
+.bpo-style-btn strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bpo-style-btn.is-selected {
+  background: var(--bp-ink);
+  color: var(--bp-paper);
+}
+
+.bpo-enter-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bp-red);
+  color: #FAF7F0;
+  border: 2.5px solid var(--bp-ink);
+  box-shadow: 5px 5px 0 var(--bp-ink);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.bpo-foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 2px solid var(--bp-ink);
+}
+
+.bpo-foot-hint {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--bp-muted);
+  letter-spacing: 0.08em;
+}
+
+.bpo-nav-btn {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 10px 14px;
+  background: var(--bp-surface);
+  color: var(--bp-ink);
+  border: 2px solid var(--bp-ink);
+  cursor: pointer;
+}
+
+.bpo-nav-btn.is-primary {
+  background: var(--bp-ink);
+  color: var(--bp-paper);
+}
+
+/* =====================================================================
+   3 RETURNING-USER ENTRANCE ANIMATIONS (.bp-splash — Container-Scaled)
+   ===================================================================== */
+
+/* Style 1: Bauhaus Grid */
+.bps-bh-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.bps-bh-line {
+  position: absolute;
+  background: color-mix(in srgb, var(--bp-ink) 22%, transparent);
+}
+
+.bps-bh-v1 {
+  width: 2px;
+  height: 100%;
+  left: 22%;
+  top: 0;
+  transform-origin: top center;
+  animation: bpsScaleY 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bps-bh-h1 {
+  height: 2px;
+  width: 100%;
+  top: 28%;
+  left: 0;
+  transform-origin: left center;
+  animation: bpsScaleX 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+}
+
+.bps-bh-block {
+  position: absolute;
+  border: 2px solid var(--bp-ink);
+}
+
+.bps-bh-red {
+  width: clamp(14px, 9cqw, 34px);
+  height: clamp(14px, 9cqw, 34px);
+  background: var(--bp-red);
+  top: 16%;
+  right: 12%;
+  animation: bpsSlideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+
+.bps-bh-blue {
+  width: clamp(10px, 6cqw, 22px);
+  height: clamp(22px, 14cqw, 52px);
+  background: var(--bp-blue);
+  bottom: 14%;
+  left: 10%;
+  animation: bpsSlideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
+}
+
+.bps-bh-yellow {
+  width: clamp(8px, 5cqw, 18px);
+  height: clamp(8px, 5cqw, 18px);
+  border-radius: 50%;
+  background: var(--bp-yellow);
+  bottom: 18%;
+  right: 14%;
+  animation: bpsPop 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
+}
+
+.bps-bh-core {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: clamp(6px, 3cqw, 14px);
+  max-width: 100%;
+}
+
+.bps-bh-logo {
+  padding: clamp(4px, 2cqw, 8px);
+  background: var(--bp-surface);
+  border: 2px solid var(--bp-ink);
+  box-shadow: 3px 3px 0 var(--bp-ink);
+  animation: bpsPop 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+.bps-bh-logo svg,
+.bps-pulse-frame svg {
+  width: clamp(28px, 26cqw, 78px);
+  height: clamp(28px, 26cqw, 78px);
+  display: block;
+}
+
+.bps-bh-title-mask {
+  overflow: hidden;
+}
+
+.bps-bh-title {
+  font-size: clamp(10px, 7.2cqw, 22px);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  animation: bpsSlideUp 0.48s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
+}
+
+.bps-bh-sub {
+  font-family: "JetBrains Mono", monospace;
+  font-size: clamp(6.5px, 3cqw, 10px);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--bp-muted);
+  margin-top: 2px;
+  animation: bpsFade 0.4s ease 0.44s both;
+}
+
+/* Style 2: Manga Ink Slash */
+.bp-splash--curtain {
+  align-items: flex-start;
+  padding: 0 clamp(10px, 8cqw, 28px);
+}
+
+.bps-curtain-slash {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: clamp(4px, 2.4cqw, 8px);
+  height: 100%;
+  background: var(--bp-red);
+  transform-origin: top center;
+  animation: bpsScaleY 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bps-curtain-content {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3px, 2cqw, 8px);
+  max-width: 100%;
+}
+
+.bps-curtain-tag {
+  font-family: "JetBrains Mono", monospace;
+  font-size: clamp(7px, 3.4cqw, 11px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--bp-red);
+  animation: bpsFade 0.38s ease 0.14s both;
+}
+
+.bps-curtain-title-mask {
+  overflow: hidden;
+}
+
+.bps-curtain-title {
+  font-size: clamp(11px, 8.2cqw, 30px);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  animation: bpsSlideUp 0.52s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+.bps-curtain-rule {
+  width: clamp(36px, 36cqw, 140px);
+  height: 2.5px;
+  background: var(--bp-ink);
+  transform-origin: left center;
+  animation: bpsScaleX 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.36s both;
+}
+
+/* Style 3: Minimalist Monogram */
+.bp-splash--pulse {
+  gap: clamp(6px, 3.5cqw, 14px);
+}
+
+.bps-pulse-frame {
+  padding: clamp(5px, 2.8cqw, 12px);
+  background: var(--bp-surface);
+  border: 2px solid var(--bp-ink);
+  animation: bpsPop 0.52s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.bps-pulse-wordmark {
+  font-family: "JetBrains Mono", monospace;
+  font-size: clamp(7.5px, 4cqw, 13px);
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  padding-left: 0.22em;
+  animation: bpsFade 0.45s ease 0.32s both;
+}
+
+@keyframes bpsScaleX {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes bpsScaleY {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes bpsSlideUp {
+  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes bpsSlideIn {
+  from { opacity: 0; transform: translate3d(20px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes bpsPop {
+  from { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.9); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes bpsFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bpo-slice,
+  .bpo-wipe,
+  .bpo-rule-draw,
+  .bpo-pop,
+  .bp-splash * {
+    animation: none !important;
+    opacity: 1 !important;
+    clip-path: none !important;
+    transform: none !important;
+  }
+}

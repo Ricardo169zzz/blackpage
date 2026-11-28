@@ -70,6 +70,12 @@ export function createMusicPlayer({
   };
 
   let loadSeq = 0;
+  let loadedTrackKey = "";
+
+  function getTrackKey(track) {
+    if (!track) return "";
+    return `${track.mediaUrl || ""}|${track.url || ""}|${track.filename || ""}|${track.downloadedAt || ""}`;
+  }
 
   function getNativeBridge() {
     return typeof window !== "undefined" ? window.BlackpageNative : null;
@@ -218,8 +224,19 @@ export function createMusicPlayer({
       );
       if (keptIdx >= 0) {
         state.currentIdx = keptIdx;
-      } else if (state.currentIdx >= state.tracks.length) {
-        state.currentIdx = state.tracks.length - 1;
+      } else {
+        // Active track was deleted: clear stale audio.src so Play loads the new banner track
+        ++loadSeq;
+        loadedTrackKey = "";
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+        state.isPlaying = false;
+        state.currentTime = 0;
+        state.duration = 0;
+        state.isOffline = false;
+        state.currentIdx = state.tracks.length ? Math.min(Math.max(0, state.currentIdx), state.tracks.length - 1) : -1;
+        syncNativeNotification();
       }
     } else if (state.currentIdx >= state.tracks.length) {
       state.currentIdx = state.tracks.length - 1;
@@ -274,6 +291,7 @@ export function createMusicPlayer({
       return;
     }
 
+    loadedTrackKey = getTrackKey(track);
     audio.src = src;
     audio.load();
     try {
@@ -287,10 +305,14 @@ export function createMusicPlayer({
   }
 
   function togglePlay() {
-    if (!getCurrentTrack()) {
+    const cur = getCurrentTrack();
+    if (!cur) {
       refreshTracks();
       if (state.tracks.length) return playIndex(0);
       return;
+    }
+    if (!audio.src || loadedTrackKey !== getTrackKey(cur)) {
+      return playIndex(state.currentIdx);
     }
     if (audio.paused) {
       audio.play().catch(() => {});

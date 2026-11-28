@@ -178,7 +178,7 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
     btn.disabled = true;
     btn.textContent = "Menyiapkan...";
     try {
-      const thumbSrc = galleryMeta?.thumbnail || (mediaType === "image" ? remoteUrl : "");
+      const thumbSrc = galleryMeta?.thumbnail || galleryMeta?.avatar || (mediaType === "image" ? remoteUrl : "");
       const thumbFilename = thumbSrc
         ? `thumb_${filename.replace(/\.[^.]+$/, "")}.jpg`
         : "";
@@ -186,7 +186,7 @@ export function initUniversalBox(root, { API_BASE, escapeHtml, prefs = { autoPas
       if (prefs.autoSaveGallery !== false) {
         saveToGallery({ ...galleryMeta, thumbnail: thumbSrc || galleryMeta?.thumbnail || "", mediaUrl: remoteUrl, mediaType, filename, thumbFilename });
         if (thumbSrc) {
-          cacheOfflineThumb(API_BASE, thumbSrc, thumbFilename);
+          cacheOfflineThumb(API_BASE, thumbSrc, thumbFilename).catch(() => {});
         }
       }
       if (res.native) {
