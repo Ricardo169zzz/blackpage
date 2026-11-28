@@ -9,7 +9,7 @@ const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
 const THEME_KEY = "tools_op_theme_v1";
 const PREFS_KEY = "tools_op_prefs_v1";
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.6.0";
 const GITHUB_REPO = "Ricardo169zzz/blackpage";
 
 const DEFAULT_PREFS = {
