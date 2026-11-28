@@ -201,7 +201,8 @@ async function fetchOtakudesuDirectNative(endpoint, body = {}) {
 }
 
 export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlayer, onRouteChange, onExit }) {
-  let view = "ongoing"; // "ongoing" | "search" | "history" | "detail" | "watch"
+  let view = "ongoing"; // "ongoing" | "search" | "history" | "downloads" | "detail" | "watch"
+  let lastListView = "ongoing";
   let ongoingPage = 1;
   let lastQuery = "";
   let currentAnime = null;
@@ -210,13 +211,26 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
   stageEl.classList.add("bp-anime-stage");
 
   const setView = (nextView) => {
+    if (["ongoing", "search", "history", "downloads"].includes(nextView)) {
+      lastListView = nextView;
+    }
     view = nextView;
     onRouteChange?.(view);
+  };
+
+  const returnToLastList = () => {
+    if (lastListView === "search") return showSearch(lastQuery);
+    if (lastListView === "history") return showHistory();
+    if (lastListView === "downloads") return showDownloads();
+    return showOngoing(ongoingPage);
   };
 
   function getPosterUrl(rawUrl) {
     if (!rawUrl) return "";
     if (window.Capacitor?.isNativePlatform?.()) return rawUrl;
+    if (/^https?:\/\/(?:i\d+\.wp\.com|[^/]*animasu\.|cdn\.myanimelist\.net)/i.test(rawUrl)) {
+      return rawUrl;
+    }
     return `${API_BASE}/api/media?${new URLSearchParams({ url: rawUrl }).toString()}`;
   }
 
@@ -278,7 +292,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
             <button type="button" class="bp-anime-card" style="--i:${Math.min(idx, 12)}" data-anime-url="${escapeHtml(it.url)}" data-anime-title="${escapeHtml(it.title)}" data-anime-thumb="${escapeHtml(it.thumbnail || "")}">
               <div class="bp-anime-poster-wrap">
                 ${it.thumbnail
-                  ? `<img class="bp-anime-poster" data-src="${escapeHtml(getPosterUrl(it.thumbnail))}" alt="${escapeHtml(it.title)}" decoding="async" />`
+                  ? `<img class="bp-anime-poster" data-src="${escapeHtml(getPosterUrl(it.thumbnail))}" alt="${escapeHtml(it.title)}" referrerpolicy="no-referrer" decoding="async" />`
                   : `<span class="bp-anime-poster-fallback">ANIME</span>`}
                 ${it.episode ? `<span class="bp-anime-ep-badge">${escapeHtml(it.episode)}</span>` : ""}
               </div>
@@ -433,7 +447,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
               <button type="button" class="bp-anime-card bp-anime-hcard" style="--i:${Math.min(idx, 8)}" data-anime-url="${escapeHtml(it.url)}" data-anime-title="${escapeHtml(it.title)}" data-anime-thumb="${escapeHtml(it.thumbnail || "")}">
                 <div class="bp-anime-poster-wrap">
                   ${it.thumbnail
-                    ? `<img class="bp-anime-poster" data-src="${escapeHtml(getPosterUrl(it.thumbnail))}" alt="${escapeHtml(it.title)}" decoding="async" />`
+                    ? `<img class="bp-anime-poster" data-src="${escapeHtml(getPosterUrl(it.thumbnail))}" alt="${escapeHtml(it.title)}" referrerpolicy="no-referrer" decoding="async" />`
                     : `<span class="bp-anime-poster-fallback">ANIME</span>`}
                   ${it.episode ? `<span class="bp-anime-ep-badge">${escapeHtml(it.episode)}</span>` : ""}
                 </div>
@@ -528,7 +542,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
         </div>
       </div>
     `;
-    stageEl.querySelector("#animeBackListBtn")?.addEventListener("click", () => showOngoing(ongoingPage));
+    stageEl.querySelector("#animeBackListBtn")?.addEventListener("click", () => returnToLastList());
 
     const body = stageEl.querySelector("#animeDetailBody");
     try {
@@ -550,7 +564,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
 
         body.innerHTML = `
           <div class="bp-anime-detail-head">
-            ${thumbSrc ? `<img class="bp-anime-detail-poster" src="${escapeHtml(thumbSrc)}" alt="${escapeHtml(data.title)}" />` : ""}
+            ${thumbSrc ? `<img class="bp-anime-detail-poster" src="${escapeHtml(thumbSrc)}" alt="${escapeHtml(data.title)}" referrerpolicy="no-referrer" />` : ""}
             <div class="bp-anime-detail-meta">
               <h3 style="margin:0 0 6px;font-size:0.98rem;">${escapeHtml(data.title)}</h3>
               ${(data.info || []).slice(0, 4).map((line) => `<div class="bp-anime-info-line">${escapeHtml(line)}</div>`).join("")}
@@ -619,14 +633,15 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
       const data = await requestAnimeApi("episode", { url: epUrl });
 
       const isNative = Boolean(window.Capacitor?.isNativePlatform?.());
+      const useDirectNative = isNative && data.streamUrl && !/googlevideo\.com/i.test(data.streamUrl);
       const videoSrc = data.streamUrl
-        ? (isNative ? data.streamUrl : `${API_BASE}/api/media?${new URLSearchParams({ url: data.streamUrl }).toString()}`)
+        ? (useDirectNative ? data.streamUrl : `${API_BASE}/api/media?${new URLSearchParams({ url: data.streamUrl }).toString()}`)
         : "";
 
       const playerHtml = videoSrc
         ? `<video class="video-preview" id="animeStreamVideo" src="${escapeHtml(videoSrc)}" controls autoplay playsinline preload="auto"></video>`
         : data.embedUrl
-          ? (isNative
+          ? (isNative && /desustream\./i.test(data.embedUrl)
             ? `<div class="alert alert-info" style="display:flex;flex-direction:column;gap:10px;">
                 <span>Player tidak mendukung embed di dalam aplikasi (diblokir CSP).</span>
                 <a class="btn btn-primary btn-sm" href="${escapeHtml(data.embedUrl)}" target="_blank" rel="noopener noreferrer">Buka Player di Browser ↗</a>
@@ -831,7 +846,11 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
         showDetail(currentAnime.url);
         return true;
       }
-      if (view === "detail" || view === "search" || view === "category" || view === "downloads" || view === "history") {
+      if (view === "detail") {
+        returnToLastList();
+        return true;
+      }
+      if (view === "search" || view === "category" || view === "downloads" || view === "history") {
         showOngoing(ongoingPage);
         return true;
       }

@@ -1334,6 +1334,11 @@ body::before {
   height: 32px;
 }
 
+body.bp-has-fs-video .topbar,
+body.bp-has-fs-video .tool-nav {
+  display: none !important;
+}
+
 .bp-video-player:fullscreen,
 .bp-video-player:-webkit-full-screen,
 .bp-video-player.is-pseudo-fs {

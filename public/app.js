@@ -11,7 +11,7 @@ const THEME_KEY = "tools_op_theme_v1";
 const PREFS_KEY = "tools_op_prefs_v1";
 const ONBOARDED_KEY = "tools_op_onboarded_v1";
 const INTRO_STYLE_KEY = "tools_op_intro_style_v1";
-const APP_VERSION = "1.6.2";
+const APP_VERSION = "1.6.3";
 const GITHUB_REPO = "Ricardo169zzz/blackpage";
 
 const DEFAULT_PREFS = {
@@ -2030,6 +2030,13 @@ function renderBackupSettings() {
           ${isEn ? "Import / Restore (.json)" : "Impor / Pulihkan (.json)"}
           <input type="file" id="importBackupInput" accept=".json,application/json,text/plain,*/*" hidden />
         </label>
+        <button type="button" class="btn" id="syncFolderBackupBtn">
+          ${isEn ? "Scan &amp; Sync Download/Blackpage" : "Pindai &amp; Sinkron Folder Blackpage"}
+        </button>
+        <label class="btn" style="text-align:center;cursor:pointer;">
+          ${isEn ? "Pick Local Files (MP3/MP4/JSON)" : "Pilih File Lokal (MP3/MP4/JSON)"}
+          <input type="file" id="pickLocalFilesBackupInput" multiple accept=".json,.mp3,.m4a,.wav,.mp4,.mkv,.jpg,.jpeg,.png,.webp,audio/*,video/*,image/*" hidden />
+        </label>
       </div>
     </div>
 
@@ -2631,28 +2638,32 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
         const cap = window.Capacitor;
         const fs = cap?.Plugins?.Filesystem;
         if (cap?.isNativePlatform?.() && fs) {
-          await fs.requestPermissions?.().catch(() => { });
-          await fs.mkdir({ path: "Download/Blackpage", directory: "EXTERNAL_STORAGE", recursive: true }).catch(() => { });
-          await fs.writeFile({
-            path: `Download/Blackpage/${filename}`,
-            data: jsonStr,
-            directory: "EXTERNAL_STORAGE",
-            encoding: "utf8",
-            recursive: true,
-          });
-          feedback.innerHTML = `<div class="alert alert-info">${isEn ? "Saved to" : "Tersimpan di"} Download/Blackpage/${escapeHtml(filename)}</div>`;
-        } else {
-          const blob = new Blob([jsonStr], { type: "application/json" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          setTimeout(() => URL.revokeObjectURL(url), 10000);
-          feedback.innerHTML = `<div class="alert alert-info">${isEn ? "Backup file downloaded!" : "File backup berhasil diunduh!"}</div>`;
+          try {
+            await fs.requestPermissions?.().catch(() => { });
+            await fs.mkdir({ path: "Download/Blackpage", directory: "EXTERNAL_STORAGE", recursive: true }).catch(() => { });
+            await fs.writeFile({
+              path: `Download/Blackpage/${filename}`,
+              data: jsonStr,
+              directory: "EXTERNAL_STORAGE",
+              encoding: "utf8",
+              recursive: true,
+            });
+            feedback.innerHTML = `<div class="alert alert-info">${isEn ? "Saved to" : "Tersimpan di"} Download/Blackpage/${escapeHtml(filename)}</div>`;
+            return;
+          } catch {
+            // Fall back to Blob download if Scoped Storage blocks overwriting/writing in Download/Blackpage
+          }
         }
+        const blob = new Blob([jsonStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        feedback.innerHTML = `<div class="alert alert-info">${isEn ? "Backup file downloaded!" : "File backup berhasil diunduh!"}</div>`;
       } catch (err) {
         feedback.innerHTML = `<div class="alert alert-error">${escapeHtml(err?.message || "Gagal ekspor backup.")}</div>`;
       }
@@ -2709,6 +2720,33 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
       } finally {
         importInput.value = "";
       }
+    });
+
+    const syncFolderBtn = stageEl.querySelector("#syncFolderBackupBtn");
+    const pickLocalFilesInput = stageEl.querySelector("#pickLocalFilesBackupInput");
+
+    syncFolderBtn?.addEventListener("click", async () => {
+      feedback.innerHTML = `<div class="alert alert-info">${isEn ? "Scanning Download/Blackpage..." : "Memindai Download/Blackpage..."}</div>`;
+      const scanned = await scanDeviceBlackpageFolder("Download/Blackpage").catch(() => null);
+      if (scanned?.totalCount) {
+        const res = await syncScannedFolderData(scanned);
+        feedback.innerHTML = `<div class="alert alert-info">✓ Tersinkron ${scanned.totalCount} file (${res.addedCount} baru).</div>`;
+      } else {
+        feedback.innerHTML = `<div class="alert alert-error">${escapeHtml(scanned?.error || (isEn ? "No files readable automatically (Android Scoped Storage). Use 'Pick Local Files' below." : "Tidak ada file terbaca otomatis (pembatasan Scoped Storage Android). Gunakan 'Pilih File Lokal' di atas."))}</div>`;
+      }
+    });
+
+    pickLocalFilesInput?.addEventListener("change", async () => {
+      const files = pickLocalFilesInput.files;
+      if (!files?.length) return;
+      const scanned = scanWebFileList(files);
+      if (scanned.totalCount) {
+        const res = await syncScannedFolderData(scanned);
+        feedback.innerHTML = `<div class="alert alert-info">✓ Tersinkron ${scanned.totalCount} file lokal${res.backupRestored ? " + backup JSON dipulihkan" : ""}.</div>`;
+      } else {
+        feedback.innerHTML = `<div class="alert alert-error">Tidak ada file MP3/MP4/Gambar/JSON yang dikenali.</div>`;
+      }
+      pickLocalFilesInput.value = "";
     });
 
     pingBtn?.addEventListener("click", async () => {
@@ -3058,6 +3096,34 @@ function upgradeVideoPlayer(videoEl) {
     syncMute();
   });
 
+  const fsPlaceholder = document.createComment("bp-vid-slot");
+
+  const enterPseudoFs = (landscape = false) => {
+    if (wrap.parentNode && wrap.parentNode !== document.body) {
+      wrap.parentNode.insertBefore(fsPlaceholder, wrap);
+      document.body.appendChild(wrap);
+    }
+    document.body.classList.add("bp-has-fs-video");
+    wrap.classList.add("is-pseudo-fs");
+    wrap.classList.toggle("is-landscape-rot", Boolean(landscape));
+  };
+
+  const exitAllFullscreen = () => {
+    wrap.querySelector(".bp-fs-orient-prompt")?.remove();
+    wrap.classList.remove("is-pseudo-fs", "is-landscape-rot");
+    document.body.classList.remove("bp-has-fs-video");
+    if (fsPlaceholder.parentNode) {
+      fsPlaceholder.parentNode.insertBefore(wrap, fsPlaceholder);
+      fsPlaceholder.remove();
+    }
+    try {
+      screen.orientation?.unlock?.();
+    } catch {}
+    if (document.fullscreenElement === wrap) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  };
+
   const showLandscapePrompt = () => {
     wrap.querySelector(".bp-fs-orient-prompt")?.remove();
     const promptEl = document.createElement("div");
@@ -3073,11 +3139,12 @@ function upgradeVideoPlayer(videoEl) {
       promptEl.remove();
       try {
         await screen.orientation?.lock?.("landscape");
+        document.body.classList.add("bp-has-fs-video");
       } catch {
         if (document.fullscreenElement === wrap) {
           await document.exitFullscreen?.().catch(() => {});
         }
-        wrap.classList.add("is-pseudo-fs", "is-landscape-rot");
+        enterPseudoFs(true);
       }
     });
 
@@ -3090,24 +3157,9 @@ function upgradeVideoPlayer(videoEl) {
     });
   };
 
-  const exitAllFullscreen = () => {
-    wrap.querySelector(".bp-fs-orient-prompt")?.remove();
-    wrap.classList.remove("is-pseudo-fs", "is-landscape-rot");
-    try {
-      screen.orientation?.unlock?.();
-    } catch {}
-    if (document.fullscreenElement === wrap) {
-      document.exitFullscreen?.().catch(() => {});
-    }
-  };
-
   document.addEventListener("fullscreenchange", () => {
     if (!document.fullscreenElement && !wrap.classList.contains("is-pseudo-fs")) {
-      wrap.querySelector(".bp-fs-orient-prompt")?.remove();
-      wrap.classList.remove("is-landscape-rot");
-      try {
-        screen.orientation?.unlock?.();
-      } catch {}
+      exitAllFullscreen();
     }
   });
 
@@ -3116,15 +3168,16 @@ function upgradeVideoPlayer(videoEl) {
       exitAllFullscreen();
       return;
     }
+    document.body.classList.add("bp-has-fs-video");
     if (wrap.requestFullscreen) {
       wrap.requestFullscreen()
         .then(() => showLandscapePrompt())
         .catch(() => {
-          wrap.classList.add("is-pseudo-fs");
+          enterPseudoFs(false);
           showLandscapePrompt();
         });
     } else {
-      wrap.classList.add("is-pseudo-fs");
+      enterPseudoFs(false);
       showLandscapePrompt();
     }
   });

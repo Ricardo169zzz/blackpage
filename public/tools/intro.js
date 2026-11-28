@@ -453,7 +453,8 @@ export function mountOnboarding(container, {
                 ${scan?.error ? `<div class="bpo-sync-err">${scan.error}</div>` : ""}
                 ${scanState.syncedMsg ? `<div class="bpo-sync-done">${scanState.syncedMsg}</div>` : ""}
                 <div class="bpo-sync-actions">
-                  <button type="button" class="bpo-sync-btn is-primary" id="bpoPickFolderBtn">PILIH FOLDER MILIKMU</button>
+                  <button type="button" class="bpo-sync-btn is-primary" id="bpoPickFolderBtn">PILIH FOLDER</button>
+                  <button type="button" class="bpo-sync-btn" id="bpoPickFilesBtn">PILIH FILE</button>
                   ${isAndroid ? `<button type="button" class="bpo-sync-btn" id="bpoRescanDefaultBtn">PINDAI ULANG</button>` : ""}
                 </div>
               </div>
@@ -484,6 +485,7 @@ export function mountOnboarding(container, {
               ${syncHtml}
               ${customFolderHtml}
               <input type="file" id="bpoWebFolderInput" webkitdirectory directory multiple hidden />
+              <input type="file" id="bpoMultiFileInput" multiple accept=".json,.mp3,.m4a,.wav,.mp4,.mkv,.jpg,.jpeg,.png,.webp,audio/*,video/*,image/*" hidden />
 
               <button type="button" class="bpo-enter-btn bpo-wipe" style="--st:4" id="bpoEnterBtn">
                 <span>MASUK KE BLACKPAGE</span>
@@ -594,6 +596,28 @@ export function mountOnboarding(container, {
       } else {
         container.querySelector("#bpoWebFolderInput")?.click();
       }
+    });
+
+    container.querySelector("#bpoPickFilesBtn")?.addEventListener("click", () => {
+      container.querySelector("#bpoMultiFileInput")?.click();
+    });
+
+    container.querySelector("#bpoMultiFileInput")?.addEventListener("change", async (e) => {
+      const files = e.target?.files;
+      if (!files?.length || !onScanWebFiles) return;
+      const webRes = onScanWebFiles(files);
+      scanState.data = webRes;
+      scanState.syncedMsg = "";
+      if (webRes?.totalCount > 0 && onSyncFolder) {
+        const synced = await onSyncFolder(webRes);
+        const parts = [];
+        if (synced?.backupRestored) parts.push("backup JSON dipulihkan");
+        if (synced?.addedCount) parts.push(`${synced.addedCount} file ditambahkan`);
+        scanState.syncedMsg = parts.length
+          ? `✓ Tersinkron otomatis (${parts.join(" & ")})`
+          : "✓ File lokal tersinkron otomatis.";
+      }
+      render();
     });
 
     container.querySelector("#bpoRescanDefaultBtn")?.addEventListener("click", () => {
