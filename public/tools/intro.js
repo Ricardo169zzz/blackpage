@@ -80,14 +80,31 @@ export function mountOnboarding(container, {
   onSavePrefs = () => {},
   onToggleTheme = null,
   getThemeLabel = () => "TEMA",
+  onScanFolder = null,
+  onScanWebFiles = null,
+  onSyncFolder = null,
   onFinish = () => {},
 } = {}) {
   let step = Math.max(1, Math.min(6, initialStep));
   let selectedStyle = INTRO_STYLES.some((s) => s.id === prefs.introStyle)
     ? prefs.introStyle
     : "bauhaus";
+  let scanState = { loading: false, data: null, syncedMsg: "", customOpen: false };
 
   const TOTAL = 6;
+
+  async function runAutoScan(folderPath = "Download/Blackpage") {
+    if (!onScanFolder) return;
+    scanState.loading = true;
+    if (step === 6) render();
+    try {
+      scanState.data = await onScanFolder(folderPath);
+    } catch {
+      scanState.data = null;
+    }
+    scanState.loading = false;
+    if (step === 6) render();
+  }
 
   function renderStepBody(currentStep) {
     switch (currentStep) {
@@ -341,11 +358,67 @@ export function mountOnboarding(container, {
 
       case 6: {
         const chosen = INTRO_STYLES.find((s) => s.id === selectedStyle) || INTRO_STYLES[0];
+        const scan = scanState.data;
+        const hasPrevData = Boolean(scan && scan.totalCount > 0);
+        const isAndroid = scan?.platform === "android";
+
+        const previewRows = hasPrevData
+          ? scan.entries.slice(0, 6).map((item) => {
+            const icon = item.kind === "backup" ? "JSON" : item.kind === "audio" ? "MP3" : item.kind === "video" ? "MP4" : "IMG";
+            return `
+              <div class="bpo-sync-item">
+                <span class="bpo-sync-kind">${icon}</span>
+                <span class="bpo-sync-name">${item.name}</span>
+              </div>
+            `;
+          }).join("")
+          : "";
+
+        const syncHtml = scanState.loading
+          ? `<div class="bpo-sync-box bpo-wipe" style="--st:3"><span class="bpo-mono-tag">MEMINDAI FOLDER DOWNLOAD/BLACKPAGE...</span></div>`
+          : hasPrevData
+            ? `
+              <div class="bpo-sync-box bpo-wipe" style="--st:3">
+                <div class="bpo-sync-title">Di perangkat ini sudah ada data aplikasi versi sebelumnya, ingin sinkronkan?</div>
+                <div class="bpo-sync-folder">📁 ${scan.folder} (${scan.totalCount} file)</div>
+                <div class="bpo-sync-list">
+                  ${previewRows}
+                  ${scan.totalCount > 6 ? `<div class="bpo-sync-more">+${scan.totalCount - 6} file lainnya</div>` : ""}
+                </div>
+                ${scanState.syncedMsg
+                  ? `<div class="bpo-sync-done">${scanState.syncedMsg}</div>`
+                  : `
+                    <div class="bpo-sync-actions">
+                      <button type="button" class="bpo-sync-btn is-primary" id="bpoSyncNowBtn">SINKRONKAN</button>
+                      <button type="button" class="bpo-sync-btn" id="bpoPickFolderBtn">PILIH FOLDER</button>
+                    </div>
+                  `}
+              </div>
+            `
+            : `
+              <div class="bpo-sync-box bpo-wipe" style="--st:3">
+                <div class="bpo-sync-title">Tidak ada data sebelumnya? Pilih folder milikmu</div>
+                ${scanState.syncedMsg ? `<div class="bpo-sync-done">${scanState.syncedMsg}</div>` : ""}
+                <div class="bpo-sync-actions">
+                  <button type="button" class="bpo-sync-btn" id="bpoPickFolderBtn">PILIH FOLDER MILIKMU</button>
+                </div>
+              </div>
+            `;
+
+        const customFolderHtml = scanState.customOpen && isAndroid
+          ? `
+            <div class="bpo-custom-folder">
+              <input type="text" class="bpo-folder-input" id="bpoCustomFolderInput" value="${scan?.folder || "Download/Blackpage"}" placeholder="Contoh: Download/Blackpage" />
+              <button type="button" class="bpo-sync-btn is-primary" id="bpoScanCustomBtn">PINDAI</button>
+            </div>
+          `
+          : "";
+
         return `
           <div class="bpo-step bpo-step--6">
             <div class="bpo-manga-head bpo-wipe" style="--st:0">
               <span class="bpo-ch-badge">最終話 // SIAP</span>
-              <span class="bpo-mono-tag">KONFIRMASI</span>
+              <span class="bpo-mono-tag">${chosen.short.toUpperCase()} • ${getThemeLabel()}</span>
             </div>
 
             <div class="bpo-step-body">
@@ -354,28 +427,14 @@ export function mountOnboarding(container, {
                 <span class="bpo-line-mask"><span class="bpo-slice" style="--st:2">Mulai sekarang.</span></span>
               </h2>
 
-              <div class="bpo-bottom-block">
-                <div class="bpo-rule bpo-rule-draw" style="--st:3"></div>
-                <div class="bpo-mokuji bpo-wipe" style="--st:4">
-                  <div class="bpo-mokuji-row">
-                    <span class="bpo-m-num">01</span>
-                    <span class="bpo-m-title">Animasi Masuk</span>
-                    <span class="bpo-m-dots"></span>
-                    <span class="bpo-m-tag">${chosen.name.toUpperCase()}</span>
-                  </div>
-                  <div class="bpo-mokuji-row">
-                    <span class="bpo-m-num">02</span>
-                    <span class="bpo-m-title">Tema Aktif</span>
-                    <span class="bpo-m-dots"></span>
-                    <span class="bpo-m-tag">${getThemeLabel()}</span>
-                  </div>
-                </div>
+              ${syncHtml}
+              ${customFolderHtml}
+              <input type="file" id="bpoWebFolderInput" webkitdirectory directory multiple hidden />
 
-                <button type="button" class="bpo-enter-btn bpo-wipe" style="--st:5" id="bpoEnterBtn">
-                  <span>MASUK KE BLACKPAGE</span>
-                  <span>→</span>
-                </button>
-              </div>
+              <button type="button" class="bpo-enter-btn bpo-wipe" style="--st:4" id="bpoEnterBtn">
+                <span>MASUK KE BLACKPAGE</span>
+                <span>→</span>
+              </button>
             </div>
           </div>
         `;
@@ -443,6 +502,9 @@ export function mountOnboarding(container, {
       if (step < TOTAL) {
         step += 1;
         render();
+        if (step === 6 && !scanState.data && !scanState.loading) {
+          runAutoScan("Download/Blackpage");
+        }
       }
     });
 
@@ -457,6 +519,40 @@ export function mountOnboarding(container, {
 
     container.querySelectorAll("[data-intro-style]").forEach((el) => {
       el.addEventListener("click", () => selectStyle(el.dataset.introStyle));
+    });
+
+    container.querySelector("#bpoSyncNowBtn")?.addEventListener("click", async () => {
+      if (!onSyncFolder || !scanState.data) return;
+      const res = await onSyncFolder(scanState.data);
+      const parts = [];
+      if (res?.backupRestored) parts.push("backup JSON dipulihkan");
+      if (res?.addedCount) parts.push(`${res.addedCount} file ditambahkan`);
+      scanState.syncedMsg = parts.length
+        ? `✓ Tersinkron: ${parts.join(" & ")}.`
+        : "✓ Folder sudah tersinkron dengan aplikasi.";
+      render();
+    });
+
+    container.querySelector("#bpoPickFolderBtn")?.addEventListener("click", () => {
+      if (scanState.data?.platform === "android") {
+        scanState.customOpen = !scanState.customOpen;
+        render();
+      } else {
+        container.querySelector("#bpoWebFolderInput")?.click();
+      }
+    });
+
+    container.querySelector("#bpoScanCustomBtn")?.addEventListener("click", () => {
+      const val = container.querySelector("#bpoCustomFolderInput")?.value?.trim();
+      if (val) runAutoScan(val);
+    });
+
+    container.querySelector("#bpoWebFolderInput")?.addEventListener("change", (e) => {
+      const files = e.target?.files;
+      if (!files?.length || !onScanWebFiles) return;
+      scanState.data = onScanWebFiles(files);
+      scanState.syncedMsg = "";
+      render();
     });
 
     container.querySelector("#bpoEnterBtn")?.addEventListener("click", () => {

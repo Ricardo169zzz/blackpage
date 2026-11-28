@@ -44,6 +44,139 @@ function removeAnimeDownload(episodeUrl) {
   } catch {}
 }
 
+function parseOtakudesuHtml(kind, html, extra = {}) {
+  const doc = new DOMParser().parseFromString(String(html || ""), "text/html");
+  const text = (el) => (el?.textContent || "").replace(/\s+/g, " ").trim();
+
+  if (kind === "ongoing" || kind === "top") {
+    const items = [...doc.querySelectorAll(".detpost")].map((b) => ({
+      title: text(b.querySelector("h2.jdlflm")),
+      url: b.querySelector("a[href*='/anime/']")?.getAttribute("href") || "",
+      thumbnail: b.querySelector("img")?.getAttribute("src") || "",
+      episode: text(b.querySelector(".epz")),
+      day: text(b.querySelector(".epztipe")),
+    })).filter((x) => x.url && x.title);
+    return { status: "success", items };
+  }
+
+  if (kind === "genre") {
+    const items = [...doc.querySelectorAll(".col-anime")].map((b) => {
+      const rating = text(b.querySelector(".col-anime-rating"));
+      return {
+        title: text(b.querySelector(".col-anime-title a")),
+        url: b.querySelector(".col-anime-title a")?.getAttribute("href") || "",
+        thumbnail: b.querySelector(".col-anime-cover img")?.getAttribute("src") || "",
+        episode: text(b.querySelector(".col-anime-eps")),
+        day: rating ? `★ ${rating}` : "",
+      };
+    }).filter((x) => x.url && x.title);
+    return { status: "success", items };
+  }
+
+  if (kind === "search") {
+    const items = [...doc.querySelectorAll("ul.chivsrc > li")].map((li) => {
+      const a = li.querySelector("h2 a");
+      const rawHtml = li.innerHTML || "";
+      const status = rawHtml.match(/<b>Status<\/b>\s*:\s*([^<]+)/i)?.[1]?.trim() || "";
+      const rating = rawHtml.match(/<b>Rating<\/b>\s*:\s*([^<]+)/i)?.[1]?.trim() || "";
+      return {
+        title: text(a),
+        url: a?.getAttribute("href") || "",
+        thumbnail: li.querySelector("img")?.getAttribute("src") || "",
+        episode: status,
+        day: rating ? `★ ${rating}` : "",
+      };
+    }).filter((x) => x.url && x.title);
+    return { status: "success", query: extra.q || "", items };
+  }
+
+  if (kind === "detail") {
+    const title = text(doc.querySelector(".jdlrx h1") || doc.querySelector("h1")).replace(/\s*Subtitle Indonesia$/i, "") || "Anime";
+    const thumbnail = doc.querySelector(".fotoanime img")?.getAttribute("src") ||
+      doc.querySelector('meta[property="og:image"]')?.getAttribute("content") || "";
+    const synopsis = text(doc.querySelector(".sinopc"));
+    const info = [...doc.querySelectorAll(".infozingle p")].map(text).filter(Boolean).slice(0, 8);
+    const seen = new Set();
+    const episodes = [];
+    for (const a of doc.querySelectorAll("a[href*='/episode/']")) {
+      const epUrl = a.getAttribute("href") || "";
+      const epTitle = text(a);
+      if (epUrl && epTitle && !seen.has(epUrl)) {
+        seen.add(epUrl);
+        episodes.push({ title: epTitle, url: epUrl });
+      }
+    }
+    return { status: "success", url: extra.url, title, thumbnail, synopsis, info, episodes };
+  }
+
+  if (kind === "episode") {
+    const title = text(doc.querySelector("h1.posttl") || doc.querySelector("h1")) || "Episode";
+    const embedUrl = doc.querySelector(".responsive-embed-stream iframe")?.getAttribute("src") ||
+      doc.querySelector("iframe")?.getAttribute("src") || "";
+    let prevUrl = null;
+    let nextUrl = null;
+    for (const a of doc.querySelectorAll("a[href*='/episode/']")) {
+      const t = text(a);
+      if (/Previous|Prev|Sebelumnya/i.test(t)) prevUrl = a.getAttribute("href");
+      if (/Next|Selanjutnya/i.test(t)) nextUrl = a.getAttribute("href");
+    }
+    const downloads = [];
+    for (const li of doc.querySelectorAll(".download li")) {
+      const quality = text(li.querySelector("strong"));
+      const a = li.querySelector("a[href^='http']");
+      if (quality && a) {
+        downloads.push({ quality, host: text(a), url: a.getAttribute("href") });
+      }
+    }
+    return { status: "success", url: extra.url, title, streamUrl: null, embedUrl: embedUrl || null, prevUrl, nextUrl, downloads: downloads.slice(0, 6) };
+  }
+
+  return { status: "success", items: [] };
+}
+
+async function fetchOtakudesuDirectNative(endpoint, body = {}) {
+  const capHttp = window.Capacitor?.Plugins?.CapacitorHttp;
+  if (!capHttp?.get) return null;
+
+  let targetUrl = "";
+  let parseKind = endpoint;
+  const p = Math.max(1, Number(body.page) || 1);
+
+  if (endpoint === "ongoing") {
+    targetUrl = p === 1 ? "https://otakudesu.blog/ongoing-anime/" : `https://otakudesu.blog/ongoing-anime/page/${p}/`;
+  } else if (endpoint === "category") {
+    const cat = String(body.category || "populer").toLowerCase();
+    if (cat === "populer") {
+      targetUrl = p === 1 ? "https://otakudesu.blog/ongoing-anime/" : `https://otakudesu.blog/ongoing-anime/page/${p}/`;
+      parseKind = "ongoing";
+    } else if (cat === "top") {
+      targetUrl = p === 1 ? "https://otakudesu.blog/complete-anime/" : `https://otakudesu.blog/complete-anime/page/${p}/`;
+      parseKind = "top";
+    } else {
+      targetUrl = p === 1 ? `https://otakudesu.blog/genres/${cat}/` : `https://otakudesu.blog/genres/${cat}/page/${p}/`;
+      parseKind = "genre";
+    }
+  } else if (endpoint === "search") {
+    targetUrl = `https://otakudesu.blog/?s=${encodeURIComponent(body.q || "")}&post_type=anime`;
+  } else if (endpoint === "detail" || endpoint === "episode") {
+    targetUrl = body.url;
+  }
+
+  if (!targetUrl) return null;
+  const resp = await capHttp.get({
+    url: targetUrl,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+      Referer: "https://otakudesu.blog/",
+      "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
+    },
+  });
+  if (resp.status < 200 || resp.status >= 300 || typeof resp.data !== "string") {
+    throw new Error(`Otakudesu HTTP ${resp.status}`);
+  }
+  return parseOtakudesuHtml(parseKind, resp.data, body);
+}
+
 export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlayer, onRouteChange, onExit }) {
   let view = "ongoing"; // "ongoing" | "search" | "history" | "detail" | "watch"
   let ongoingPage = 1;
@@ -57,6 +190,33 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
     view = nextView;
     onRouteChange?.(view);
   };
+
+  function getPosterUrl(rawUrl) {
+    if (!rawUrl) return "";
+    if (window.Capacitor?.isNativePlatform?.()) return rawUrl;
+    return `${API_BASE}/api/media?${new URLSearchParams({ url: rawUrl }).toString()}`;
+  }
+
+  async function requestAnimeApi(endpoint, body = {}) {
+    try {
+      const res = await fetch(`${API_BASE}/api/anime/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) return data;
+      if (res.status === 403 || /403/.test(data?.message || "")) {
+        const direct = await fetchOtakudesuDirectNative(endpoint, body);
+        if (direct) return direct;
+      }
+      throw new Error(data?.message || "Gagal memuat data anime.");
+    } catch (err) {
+      const direct = await fetchOtakudesuDirectNative(endpoint, body).catch(() => null);
+      if (direct) return direct;
+      throw err;
+    }
+  }
 
   function hydratePosters(container) {
     if (!container) return;
@@ -95,7 +255,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
             <button type="button" class="bp-anime-card" style="--i:${Math.min(idx, 12)}" data-anime-url="${escapeHtml(it.url)}" data-anime-title="${escapeHtml(it.title)}" data-anime-thumb="${escapeHtml(it.thumbnail || "")}">
               <div class="bp-anime-poster-wrap">
                 ${it.thumbnail
-                  ? `<img class="bp-anime-poster" data-src="${escapeHtml(`${API_BASE}/api/media?${new URLSearchParams({ url: it.thumbnail }).toString()}`)}" alt="${escapeHtml(it.title)}" decoding="async" />`
+                  ? `<img class="bp-anime-poster" data-src="${escapeHtml(getPosterUrl(it.thumbnail))}" alt="${escapeHtml(it.title)}" decoding="async" />`
                   : `<span class="bp-anime-poster-fallback">ANIME</span>`}
                 ${it.episode ? `<span class="bp-anime-ep-badge">${escapeHtml(it.episode)}</span>` : ""}
               </div>
@@ -133,13 +293,8 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
 
     const host = stageEl.querySelector("#animeGridHost");
     try {
-      const res = await fetch(`${API_BASE}/api/anime/ongoing`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page: ongoingPage }),
-      });
-      const data = await res.json();
-      if (!res.ok || !Array.isArray(data.items)) {
+      const data = await requestAnimeApi("ongoing", { page: ongoingPage });
+      if (!Array.isArray(data.items)) {
         throw new Error(data?.message || "Gagal memuat anime ongoing.");
       }
       host.innerHTML = `
@@ -188,13 +343,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
 
     const host = stageEl.querySelector("#animeCatFullHost");
     try {
-      const res = await fetch(`${API_BASE}/api/anime/category`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: cat.id, page }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Gagal memuat kategori.");
+      const data = await requestAnimeApi("category", { category: cat.id, page });
       host.innerHTML = `
         ${renderCardsHtml(data.items || [], "Tidak ada anime di kategori ini.")}
         <div class="bp-quran-pager">
@@ -252,12 +401,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
         const rowEl = stageEl.querySelector(`[data-cat-row="${cat.id}"]`);
         if (!rowEl || !rowEl.isConnected) return;
         try {
-          const res = await fetch(`${API_BASE}/api/anime/category`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ category: cat.id, page: 1 }),
-          });
-          const data = await res.json();
+          const data = await requestAnimeApi("category", { category: cat.id, page: 1 });
           const list = (data.items || []).slice(0, 10);
           if (!rowEl.isConnected) return;
           rowEl.innerHTML = list
@@ -266,7 +410,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
               <button type="button" class="bp-anime-card bp-anime-hcard" style="--i:${Math.min(idx, 8)}" data-anime-url="${escapeHtml(it.url)}" data-anime-title="${escapeHtml(it.title)}" data-anime-thumb="${escapeHtml(it.thumbnail || "")}">
                 <div class="bp-anime-poster-wrap">
                   ${it.thumbnail
-                    ? `<img class="bp-anime-poster" data-src="${escapeHtml(`${API_BASE}/api/media?${new URLSearchParams({ url: it.thumbnail }).toString()}`)}" alt="${escapeHtml(it.title)}" decoding="async" />`
+                    ? `<img class="bp-anime-poster" data-src="${escapeHtml(getPosterUrl(it.thumbnail))}" alt="${escapeHtml(it.title)}" decoding="async" />`
                     : `<span class="bp-anime-poster-fallback">ANIME</span>`}
                   ${it.episode ? `<span class="bp-anime-ep-badge">${escapeHtml(it.episode)}</span>` : ""}
                 </div>
@@ -303,13 +447,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
       lastQuery = clean;
       resEl.innerHTML = `<div class="bp-sp-skeleton" style="flex-direction:column;gap:10px;"><div class="bp-skel-box bp-skel-line"></div><div class="bp-skel-box bp-skel-line short"></div></div>`;
       try {
-        const res = await fetch(`${API_BASE}/api/anime/search`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ q: clean }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.message || "Gagal mencari anime.");
+        const data = await requestAnimeApi("search", { q: clean });
         resEl.innerHTML = renderCardsHtml(data.items || [], `Anime "${clean}" tidak ditemukan.`);
         hydratePosters(resEl);
       } catch (err) {
@@ -371,13 +509,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
 
     const body = stageEl.querySelector("#animeDetailBody");
     try {
-      const res = await fetch(`${API_BASE}/api/anime/detail`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Gagal memuat detail anime.");
+      const data = await requestAnimeApi("detail", { url });
       currentAnime = data;
       saveHistory({
         url,
@@ -391,9 +523,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
         const perPage = 20;
         const totalPages = Math.max(1, Math.ceil(eps.length / perPage));
         const slice = eps.slice((epPage - 1) * perPage, epPage * perPage);
-        const thumbSrc = data.thumbnail
-          ? `${API_BASE}/api/media?${new URLSearchParams({ url: data.thumbnail }).toString()}`
-          : "";
+        const thumbSrc = getPosterUrl(data.thumbnail);
 
         body.innerHTML = `
           <div class="bp-anime-detail-head">
@@ -463,13 +593,7 @@ export function mountAnimeApp(stageEl, { API_BASE, escapeHtml, upgradeVideoPlaye
 
     const body = stageEl.querySelector("#animeWatchBody");
     try {
-      const res = await fetch(`${API_BASE}/api/anime/episode`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: epUrl }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Gagal memuat stream episode.");
+      const data = await requestAnimeApi("episode", { url: epUrl });
 
       const proxyVideo = data.streamUrl
         ? `${API_BASE}/api/media?${new URLSearchParams({ url: data.streamUrl }).toString()}`

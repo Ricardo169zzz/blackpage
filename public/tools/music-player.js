@@ -105,14 +105,14 @@ export function createMusicPlayer({
     if (bridge && typeof bridge.requestBackgroundMusicPermission === "function") {
       try {
         bridge.requestBackgroundMusicPermission();
-      } catch {}
+      } catch { }
       setTimeout(() => notify(), 600);
       return hasBackgroundPermission();
     }
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
       try {
         await Notification.requestPermission();
-      } catch {}
+      } catch { }
     }
     notify();
     return hasBackgroundPermission();
@@ -187,7 +187,7 @@ export function createMusicPlayer({
             Boolean(state.isPlaying)
           );
         }
-      } catch {}
+      } catch { }
     }
 
     if ("mediaSession" in navigator && track) {
@@ -200,7 +200,7 @@ export function createMusicPlayer({
           artwork: [{ src: thumb, sizes: "512x512", type: track.thumbnail ? "image/png" : "image/svg+xml" }],
         });
         navigator.mediaSession.playbackState = state.isPlaying ? "playing" : "paused";
-      } catch {}
+      } catch { }
     }
   }
 
@@ -276,12 +276,17 @@ export function createMusicPlayer({
     try {
       src = await resolveOfflineMediaSrc(track);
       if (src) state.isOffline = true;
-    } catch {}
+    } catch { }
     if (seq !== loadSeq) return;
 
     if (!src && track.mediaUrl) {
-      const apiBase = getApiBase();
-      src = `${apiBase}/api/media?${new URLSearchParams({ url: track.mediaUrl }).toString()}`;
+      const rawUrl = String(track.mediaUrl);
+      if (/^(blob:|data:|capacitor:|file:|https?:\/\/localhost[:/])/i.test(rawUrl)) {
+        src = rawUrl;
+      } else {
+        const apiBase = getApiBase();
+        src = `${apiBase}/api/media?${new URLSearchParams({ url: rawUrl }).toString()}`;
+      }
     }
 
     if (!src) {
@@ -299,6 +304,9 @@ export function createMusicPlayer({
       state.isPlaying = true;
     } catch {
       state.isPlaying = false;
+      state.error = state.isOffline
+        ? "File audio lokal gagal diputar."
+        : "Audio gagal diputar. Pastikan file ada di folder unduhan.";
     }
     syncNativeNotification();
     notify();
@@ -315,7 +323,7 @@ export function createMusicPlayer({
       return playIndex(state.currentIdx);
     }
     if (audio.paused) {
-      audio.play().catch(() => {});
+      audio.play().catch(() => { });
     } else {
       audio.pause();
     }
@@ -403,7 +411,7 @@ export function createMusicPlayer({
   audio.addEventListener("ended", () => {
     if (state.repeat === "one") {
       audio.currentTime = 0;
-      audio.play().catch(() => {});
+      audio.play().catch(() => { });
       return;
     }
     if (state.repeat === "all" || state.currentIdx < state.tracks.length - 1) {
@@ -429,7 +437,7 @@ export function createMusicPlayer({
       navigator.mediaSession.setActionHandler("previoustrack", () => prev());
       navigator.mediaSession.setActionHandler("nexttrack", () => next());
       navigator.mediaSession.setActionHandler("stop", () => stop());
-    } catch {}
+    } catch { }
   }
 
   window.__bpMusicAction = (action) => {
@@ -517,11 +525,11 @@ export function createMusicPlayer({
           </div>
 
           ${!isSavedOffline
-            ? `<div class="bp-sp-offline-notice">
+        ? `<div class="bp-sp-offline-notice">
                 <span>${en ? "Not downloaded yet. Download to listen offline without data." : "Lagu ini belum diunduh. Unduh agar bisa didengar offline tanpa kuota."}</span>
                 <button type="button" class="btn btn-sm btn-success" id="musicDownloadOfflineBtn">${en ? "⬇ DOWNLOAD OFFLINE" : "⬇ UNDUH OFFLINE"}</button>
               </div>`
-            : ""}
+        : ""}
 
           ${snap.error ? `<div class="alert alert-error" style="margin-top:8px;">${escapeHtml(snap.error)}</div>` : ""}
 
@@ -878,8 +886,19 @@ export function createMusicPlayer({
     });
   }
 
+  function resetLoadedTrack() {
+    loadedTrackKey = "";
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    state.isPlaying = false;
+    state.error = "";
+    notify();
+  }
+
   return {
     refreshTracks,
+    resetLoadedTrack,
     getSnapshot,
     playIndex,
     togglePlay,

@@ -9,7 +9,7 @@ const API_BASE_KEY = "tools_op_api_base_v1";
 const TT_HISTORY_KEY = "tools_op_tiktok_history_v1";
 const THEME_KEY = "tools_op_theme_v1";
 const PREFS_KEY = "tools_op_prefs_v1";
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.6.1";
 const GITHUB_REPO = "Ricardo169zzz/blackpage";
 
 const DEFAULT_PREFS = {
@@ -1228,21 +1228,204 @@ function renderGallery(fromPopstate = false) {
   }
 }
 
+const sessionLocalMediaUrls = new Map();
+
+function classifyDeviceFilename(name = "") {
+  const lower = String(name).toLowerCase();
+  if (/\.json$/i.test(lower)) return "backup";
+  if (/\.(mp3|m4a|wav|ogg|aac|flac|opus)$/i.test(lower)) return "audio";
+  if (/\.(mp4|mkv|webm|mov|3gp)$/i.test(lower)) return "video";
+  if (/\.(jpg|jpeg|png|webp)$/i.test(lower)) return "image";
+  return "";
+}
+
+async function scanDeviceBlackpageFolder(folderPath = "Download/Blackpage") {
+  const cap = window.Capacitor;
+  const fs = cap?.Plugins?.Filesystem;
+  const cleanFolder = String(folderPath || "Download/Blackpage").replace(/^\/+|\/+$/g, "");
+  const result = {
+    platform: cap?.isNativePlatform?.() && fs ? "android" : "web",
+    folder: cleanFolder,
+    backups: [],
+    audios: [],
+    videos: [],
+    images: [],
+    entries: [],
+    totalCount: 0,
+  };
+
+  if (result.platform !== "android") return result;
+
+  const subPaths = [cleanFolder, `${cleanFolder}/audio`, `${cleanFolder}/video`];
+  const seen = new Set();
+
+  for (const dirPath of subPaths) {
+    try {
+      const listed = await fs.readdir({ path: dirPath, directory: "EXTERNAL_STORAGE" });
+      for (const entry of listed?.files || []) {
+        const name = typeof entry === "string" ? entry : entry?.name;
+        const type = typeof entry === "object" ? entry?.type : "file";
+        if (!name || type === "directory") continue;
+        const fullPath = `${dirPath}/${name}`;
+        if (seen.has(fullPath)) continue;
+        const kind = classifyDeviceFilename(name);
+        if (!kind) continue;
+        seen.add(fullPath);
+        const item = { name, path: fullPath, kind };
+        result.entries.push(item);
+        if (kind === "backup") result.backups.push(item);
+        else if (kind === "audio") result.audios.push(item);
+        else if (kind === "video") result.videos.push(item);
+        else if (kind === "image") result.images.push(item);
+      }
+    } catch { }
+  }
+
+  result.totalCount = result.entries.length;
+  return result;
+}
+
+function scanWebFileList(fileList) {
+  const files = Array.from(fileList || []);
+  const firstRel = files[0]?.webkitRelativePath || "";
+  const rootFolder = firstRel.includes("/") ? firstRel.split("/")[0] : "Folder Pilihan";
+  const result = {
+    platform: "web",
+    folder: rootFolder,
+    backups: [],
+    audios: [],
+    videos: [],
+    images: [],
+    entries: [],
+    totalCount: 0,
+  };
+
+  for (const file of files) {
+    const kind = classifyDeviceFilename(file.name);
+    if (!kind) continue;
+    const item = { name: file.name, path: file.webkitRelativePath || file.name, kind, file };
+    result.entries.push(item);
+    if (kind === "backup") result.backups.push(item);
+    else if (kind === "audio") result.audios.push(item);
+    else if (kind === "video") result.videos.push(item);
+    else if (kind === "image") result.images.push(item);
+  }
+  result.totalCount = result.entries.length;
+  return result;
+}
+
+async function syncScannedFolderData(scanResult) {
+  if (!scanResult || !scanResult.totalCount) return { synced: false, addedCount: 0, backupRestored: false };
+  let backupRestored = false;
+
+  // 1. Restore latest Blackpage JSON backup if present
+  const backupFile = scanResult.backups.find((b) => /blackpage/i.test(b.name)) || scanResult.backups[0];
+  if (backupFile) {
+    try {
+      let text = "";
+      if (backupFile.file) {
+        text = await backupFile.file.text();
+      } else {
+        const fs = window.Capacitor?.Plugins?.Filesystem;
+        if (fs) {
+          const read = await fs.readFile({ path: backupFile.path, directory: "EXTERNAL_STORAGE" });
+          if (read?.data) {
+            text = decodeURIComponent(escape(atob(read.data)));
+          }
+        }
+      }
+      if (text) {
+        const data = JSON.parse(text);
+        if (data?.app === "Blackpage") {
+          if (Array.isArray(data.history)) {
+            localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(data.history.slice(0, 30)));
+          }
+          if (data.prefs && typeof data.prefs === "object") {
+            savePrefs({ ...DEFAULT_PREFS, ...data.prefs, onboardingDone: true });
+          }
+          if (typeof data.theme === "string") {
+            localStorage.setItem(THEME_KEY, data.theme);
+            applyTheme(data.theme);
+          }
+          if (typeof data.lang === "string") {
+            localStorage.setItem(LANG_KEY, data.lang);
+          }
+          backupRestored = true;
+        }
+      }
+    } catch { }
+  }
+
+  // 2. Merge audio & video files from the scanned folder into gallery/music history
+  const existing = loadGalleryItems();
+  const knownFiles = new Set(existing.map((x) => x.filename).filter(Boolean));
+  let addedCount = 0;
+
+  for (const media of [...scanResult.audios, ...scanResult.videos]) {
+    if (media.file && !sessionLocalMediaUrls.has(media.name)) {
+      sessionLocalMediaUrls.set(media.name, URL.createObjectURL(media.file));
+    }
+    if (!knownFiles.has(media.name)) {
+      knownFiles.add(media.name);
+      existing.unshift({
+        id: `sync_${Date.now()}_${addedCount}`,
+        title: media.name.replace(/\.[^.]+$/, ""),
+        author: "Lokal",
+        platform: "local",
+        mediaType: media.kind === "audio" ? "audio" : "video",
+        filename: media.name,
+        localPath: media.path,
+        downloadedAt: new Date().toISOString(),
+      });
+      addedCount += 1;
+    }
+  }
+
+  if (addedCount > 0) {
+    localStorage.setItem(TT_HISTORY_KEY, JSON.stringify(existing.slice(0, 30)));
+  }
+
+  if (scanResult.folder && scanResult.platform === "android") {
+    const curPrefs = getPrefs();
+    savePrefs({
+      ...curPrefs,
+      audioFolder: `${scanResult.folder}/audio`,
+      videoFolder: `${scanResult.folder}/video`,
+    });
+  }
+
+  musicPlayer.resetLoadedTrack?.();
+  musicPlayer.refreshTracks();
+  return { synced: true, addedCount, backupRestored };
+}
+
 async function resolveOfflineMediaSrc(item) {
+  if (item?.filename && sessionLocalMediaUrls.has(item.filename)) {
+    return sessionLocalMediaUrls.get(item.filename);
+  }
   const cap = window.Capacitor;
   const fs = cap?.Plugins?.Filesystem;
   if (!cap?.isNativePlatform?.() || !fs || !item?.filename) return "";
+  const prefs = getPrefs();
   const subDir = item.mediaType === "audio" ? "audio" : item.mediaType === "image" ? "image" : "video";
-  const path = `Download/Blackpage/${subDir}/${item.filename}`;
-  try {
-    await fs.stat({ path, directory: "EXTERNAL_STORAGE" });
-    const res = await fs.getUri({ path, directory: "EXTERNAL_STORAGE" });
-    const uri = res?.uri || "";
-    if (!uri) return "";
-    return typeof cap.convertFileSrc === "function" ? cap.convertFileSrc(uri) : uri;
-  } catch {
-    return "";
+  const customDir = item.mediaType === "audio" ? prefs.audioFolder : prefs.videoFolder;
+  const candidates = [
+    item.localPath,
+    customDir ? `${String(customDir).replace(/\/+$/, "")}/${item.filename}` : "",
+    `Download/Blackpage/${subDir}/${item.filename}`,
+    `Download/Blackpage/${item.filename}`,
+  ].filter(Boolean);
+
+  for (const path of candidates) {
+    try {
+      await fs.stat({ path, directory: "EXTERNAL_STORAGE" });
+      const res = await fs.getUri({ path, directory: "EXTERNAL_STORAGE" });
+      const uri = res?.uri || "";
+      if (!uri) continue;
+      return typeof cap.convertFileSrc === "function" ? cap.convertFileSrc(uri) : uri;
+    } catch { }
   }
+  return "";
 }
 
 function renderGalleryDetail(idx, fromPopstate = false) {
@@ -2411,6 +2594,7 @@ function renderSettingDetail(sectionId, fromPopstate = false) {
         }
         applyMotionPref();
         applyBgEffectPref();
+        musicPlayer.resetLoadedTrack?.();
         musicPlayer.refreshTracks();
         renderSettingDetail("backup", true);
         const fb = stageEl.querySelector("#backupFeedback");
@@ -3005,7 +3189,7 @@ function openGalleryFullscreen(idx) {
     if (!isImage && mediaEl) {
       upgradeVideoPlayer(mediaEl);
       mediaEl.addEventListener("play", () => musicPlayer.pause());
-      mediaEl.play?.().catch(() => {});
+      mediaEl.play?.().catch(() => { });
     }
 
     resolveOfflineMediaSrc(item).then((localSrc) => {
@@ -3013,7 +3197,7 @@ function openGalleryFullscreen(idx) {
       if (offlineTag) offlineTag.hidden = false;
       mediaEl.src = localSrc;
       mediaEl.load?.();
-      if (!isImage) mediaEl.play?.().catch(() => {});
+      if (!isImage) mediaEl.play?.().catch(() => { });
     });
 
     const goNext = () => {
@@ -3338,7 +3522,13 @@ if (bpIntroEl) {
         applyTheme(next);
       },
       getThemeLabel: () => (document.documentElement.dataset.theme === "dark" ? "DARK" : "LIGHT"),
-      onFinish: () => finishIntro(60),
+      onScanFolder: (folderPath) => scanDeviceBlackpageFolder(folderPath),
+      onScanWebFiles: (fileList) => scanWebFileList(fileList),
+      onSyncFolder: (scanResult) => syncScannedFolderData(scanResult),
+      onFinish: () => {
+        if (activePage === "home") renderHome(true);
+        finishIntro(60);
+      },
     });
   } else {
     bpIntroEl.innerHTML = renderSplashMarkup(prefs.introStyle || "bauhaus");

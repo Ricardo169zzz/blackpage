@@ -6154,6 +6154,115 @@ body::before {
   cursor: pointer;
 }
 
+/* Step 6: Previous Data & Custom Folder Sync */
+.bpo-sync-box {
+  background: var(--bp-surface);
+  border: 2px solid var(--bp-ink);
+  padding: 12px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bpo-sync-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.bpo-sync-folder {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bp-blue);
+}
+
+.bpo-sync-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 126px;
+  overflow-y: auto;
+  padding: 6px 0;
+  border-top: 1.5px solid color-mix(in srgb, var(--bp-ink) 18%, transparent);
+  border-bottom: 1.5px solid color-mix(in srgb, var(--bp-ink) 18%, transparent);
+}
+
+.bpo-sync-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+}
+
+.bpo-sync-kind {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 5px;
+  background: var(--bp-ink);
+  color: var(--bp-paper);
+  flex: 0 0 auto;
+}
+
+.bpo-sync-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bpo-sync-more {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--bp-muted);
+}
+
+.bpo-sync-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bpo-sync-btn {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 11px;
+  border: 2px solid var(--bp-ink);
+  background: var(--bp-paper);
+  color: var(--bp-ink);
+  cursor: pointer;
+}
+
+.bpo-sync-btn.is-primary {
+  background: var(--bp-ink);
+  color: var(--bp-paper);
+}
+
+.bpo-sync-done {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--bp-blue);
+}
+
+.bpo-custom-folder {
+  display: flex;
+  gap: 6px;
+}
+
+.bpo-folder-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 2px solid var(--bp-ink);
+  background: var(--bp-surface);
+  color: var(--bp-ink);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+}
+
 .bpo-foot {
   flex: 0 0 auto;
   display: flex;
